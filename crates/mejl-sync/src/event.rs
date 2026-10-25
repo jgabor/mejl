@@ -1,6 +1,6 @@
 //! What the engine reports to the caller's sink.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use jiff::Timestamp;
 use mejl_jmap::Id;
@@ -260,6 +260,11 @@ pub struct SyncStatus {
     /// Local drafts whose newest version is not on the server yet. See
     /// [`Command::SaveDraftToServer`](crate::Command::SaveDraftToServer).
     pub drafts_pending: usize,
+    /// The local ids of those drafts.
+    pub drafts_waiting: BTreeSet<String>,
+    /// Drafts whose newest version the server refused, by local id, with
+    /// the reason. They are tried again once they change.
+    pub drafts_refused: BTreeMap<String, String>,
     /// The account has no Drafts mailbox, so drafts stay on this device.
     pub drafts_local_only: bool,
     /// Work in progress.
@@ -280,6 +285,8 @@ impl Default for SyncStatus {
             held_sends: 0,
             failed: 0,
             drafts_pending: 0,
+            drafts_waiting: BTreeSet::new(),
+            drafts_refused: BTreeMap::new(),
             drafts_local_only: false,
             activity: Activity::default(),
             last_error: None,

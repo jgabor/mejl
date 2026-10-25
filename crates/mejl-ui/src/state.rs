@@ -11,7 +11,7 @@
 //! keep what was typed. Modal pieces (help, confirms, prompts, the palette
 //! and every picker) are [`Overlay`]s; the top one gets the keys.
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -727,13 +727,21 @@ fn push_tree<'a>(
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DraftSync {
     /// Drafts whose newest version is not on the server yet.
-    pub pending: usize,
+    pub waiting: BTreeSet<DraftId>,
+    /// Drafts whose newest version the server refused, with the reason.
+    /// Each draft shows only its own.
+    pub refused: BTreeMap<DraftId, String>,
     /// The account has no Drafts mailbox, so drafts stay on this device.
     pub local_only: bool,
-    /// Whether the server answers, so pending drafts are on their way.
+    /// Whether the server answers, so waiting drafts are on their way.
     pub online: bool,
-    /// Why the server refused a draft, while one is pending.
-    pub error: Option<String>,
+}
+
+impl DraftSync {
+    /// Whether this draft's newest version is only on this device.
+    pub fn on_device(&self, id: &DraftId) -> bool {
+        self.local_only || self.refused.contains_key(id)
+    }
 }
 
 /// Everything the UI remembers.

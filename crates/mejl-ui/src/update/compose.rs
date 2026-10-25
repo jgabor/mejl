@@ -450,7 +450,7 @@ impl AppState {
         if c.dirty || !c.ever_saved || c.saving {
             cmds.push(Cmd::SaveDraft(Box::new(c.message())));
         }
-        let text = if self.draft_sync().local_only {
+        let text = if self.draft_sync().on_device(&c.draft_id) {
             "Draft saved on this device"
         } else {
             "Draft saved in Drafts"

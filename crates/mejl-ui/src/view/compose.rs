@@ -8,7 +8,7 @@ use super::{Hint, MailView, Painter};
 use crate::action::Action;
 use crate::address;
 use crate::compose::{AddressField, ComposeState, Field};
-use crate::data::ComposeKind;
+use crate::data::{ComposeKind, DraftId};
 use crate::hit::HitTarget;
 use crate::reader::DocSpan;
 use crate::state::DraftSync;
@@ -37,21 +37,23 @@ fn size(bytes: u64) -> String {
 
 /// Where the saved draft is, in words for the status line. Only "Drafts"
 /// when the newest version is on the server.
-fn where_drafts(d: &DraftSync) -> &'static str {
+fn where_drafts(d: &DraftSync, id: &DraftId) -> &'static str {
     if d.local_only {
         "on this device: the account has no Drafts folder"
-    } else if d.pending > 0 && d.online {
+    } else if d.refused.contains_key(id) {
+        "on this device"
+    } else if d.waiting.contains(id) && d.online {
         "saving to Drafts"
-    } else if d.pending > 0 {
+    } else if d.waiting.contains(id) {
         "on this device until online"
     } else {
         "Drafts"
     }
 }
 
-/// The server's reason for refusing a draft, while one is still waiting.
-fn draft_error(d: &DraftSync) -> Option<&str> {
-    d.error.as_deref().filter(|_| d.pending > 0)
+/// The server's reason for refusing this draft's newest version.
+fn draft_error<'a>(d: &'a DraftSync, id: &DraftId) -> Option<&'a str> {
+    d.refused.get(id).map(String::as_str)
 }
 
 impl MailView<'_> {
@@ -61,7 +63,7 @@ impl MailView<'_> {
         let Some(c) = s.compose.as_deref() else {
             return;
         };
-        let right = if c.ever_saved && s.draft_sync.local_only {
+        let right = if c.ever_saved && s.draft_sync.on_device(&c.draft_id) {
             "draft on this device"
         } else if c.ever_saved {
             "draft in Drafts"
@@ -468,11 +470,11 @@ impl MailView<'_> {
                 DocSpan::new(format!("{} ", g.ok), StyleName::StatusOk),
                 DocSpan::new(format!("Draft saved {ago}"), StyleName::StatusText),
                 DocSpan::new(
-                    format!("  ({})", where_drafts(&s.draft_sync)),
+                    format!("  ({})", where_drafts(&s.draft_sync, &c.draft_id)),
                     StyleName::Dim,
                 ),
             ];
-            if let Some(e) = draft_error(&s.draft_sync) {
+            if let Some(e) = draft_error(&s.draft_sync, &c.draft_id) {
                 spans.push(DocSpan::new(
                     format!("  ! {}", sanitize(e)),
                     StyleName::StatusError,
@@ -536,23 +538,34 @@ mod tests {
 
     #[test]
     fn the_status_says_where_the_draft_is() {
+        let me = DraftId::from("d1");
+        let other = DraftId::from("d2");
         let mut d = DraftSync::default();
-        assert_eq!(where_drafts(&d), "Drafts");
-        d.pending = 1;
-        assert_eq!(where_drafts(&d), "on this device until online");
+        assert_eq!(where_drafts(&d, &me), "Drafts");
+        d.waiting.insert(me.clone());
+        assert_eq!(where_drafts(&d, &me), "on this device until online");
         d.online = true;
-        assert_eq!(where_drafts(&d), "saving to Drafts");
-        d.local_only = true;
-        assert_eq!(
-            where_drafts(&d),
-            "on this device: the account has no Drafts folder"
+        assert_eq!(where_drafts(&d, &me), "saving to Drafts");
+        assert_eq!(where_drafts(&d, &other), "Drafts", "only its own upload");
+        d.refused.insert(
+            me.clone(),
+            "Cannot save the draft to the server: too big".into(),
         );
-        d.error = Some("Cannot save the draft to the server: too big".into());
         assert_eq!(
-            draft_error(&d),
+            where_drafts(&d, &me),
+            "on this device",
+            "not saving any more"
+        );
+        assert_eq!(
+            draft_error(&d, &me),
             Some("Cannot save the draft to the server: too big")
         );
-        d.pending = 0;
-        assert_eq!(draft_error(&d), None, "stale once the draft is up");
+        assert_eq!(draft_error(&d, &other), None, "not another draft's refusal");
+        assert!(d.on_device(&me) && !d.on_device(&other));
+        d.local_only = true;
+        assert_eq!(
+            where_drafts(&d, &other),
+            "on this device: the account has no Drafts folder"
+        );
     }
 }

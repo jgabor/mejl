@@ -38,6 +38,7 @@ use mejl_store::{DraftTrash, DraftUpload, DraftUploadDone, type_name};
 use crate::backoff::delay_for;
 use crate::command::{OutgoingMessage, RoleMailboxes};
 use crate::error::{Class, SyncError, describe_set_error, set_error_is_transient};
+use crate::event::SyncStatus;
 use crate::send::{build_email, find_by_message_id, make_message_id};
 use crate::shared::Shared;
 use crate::store_thread::StoreCtx;
@@ -64,6 +65,10 @@ pub(crate) fn queue(sh: &Arc<Shared>, local_id: String, message: OutgoingMessage
             .and_then(|payload| Ok(ctx.store.queue_draft_upload(&local_id, &payload)?));
         match queued {
             Ok(true) => {
+                // A new version may be one the server takes.
+                ctx.status.update(|s| {
+                    s.drafts_refused.remove(&local_id);
+                });
                 refresh_pending(ctx);
                 ctx.draft_wake.notify_one();
             }
@@ -81,12 +86,39 @@ pub(crate) fn queue(sh: &Arc<Shared>, local_id: String, message: OutgoingMessage
 /// offline, so the store jobs that change the count call it too.
 pub(crate) fn refresh_pending(ctx: &mut StoreCtx) {
     match ctx.store.draft_uploads() {
-        Ok(uploads) => {
-            let pending = uploads.len();
-            ctx.status.update(|s| s.drafts_pending = pending);
-        }
+        Ok(uploads) => ctx.status.update(|s| set_waiting(s, &uploads)),
         Err(e) => tracing::warn!(error = %e, "cannot count draft copies to upload"),
     }
+}
+
+/// Records which drafts wait for the server. A refusal is dropped once its
+/// draft no longer waits: it was sent, deleted or saved again.
+fn set_waiting(s: &mut SyncStatus, uploads: &[DraftUpload]) {
+    s.drafts_pending = uploads.len();
+    s.drafts_waiting = uploads.iter().map(|u| u.local_id.clone()).collect();
+    let waiting = &s.drafts_waiting;
+    s.drafts_refused.retain(|id, _| waiting.contains(id));
+}
+
+/// A revision the server refused for good, and why.
+struct Refusal {
+    rev: i64,
+    reason: String,
+}
+
+/// Remembers a refusal and shows it on the draft it is about.
+fn refuse(sh: &Shared, refused: &mut HashMap<String, Refusal>, job: DraftUpload, reason: String) {
+    sh.status.update(|s| {
+        s.drafts_refused
+            .insert(job.local_id.clone(), reason.clone());
+    });
+    refused.insert(
+        job.local_id,
+        Refusal {
+            rev: job.rev,
+            reason,
+        },
+    );
 }
 
 /// What one round of work did.
@@ -103,7 +135,7 @@ enum Step {
 pub(crate) async fn draft_loop(sh: Arc<Shared>) {
     // Revisions the server refused for good, by draft. They are tried
     // again only once the draft changes.
-    let mut refused: HashMap<String, i64> = HashMap::new();
+    let mut refused: HashMap<String, Refusal> = HashMap::new();
     let mut failures = 0u32;
     loop {
         if sh.cancel.is_cancelled() {
@@ -164,7 +196,7 @@ fn failed(sh: &Shared, e: &SyncError) -> Step {
     Step::Retry(sh.note(e))
 }
 
-async fn step(sh: &Shared, refused: &mut HashMap<String, i64>) -> Result<Step, SyncError> {
+async fn step(sh: &Shared, refused: &mut HashMap<String, Refusal>) -> Result<Step, SyncError> {
     let account = match sh.account() {
         Ok(a) => a,
         Err(e) => return Ok(failed(sh, &e)),
@@ -187,21 +219,24 @@ async fn step(sh: &Shared, refused: &mut HashMap<String, i64>) -> Result<Step, S
             Ok((uploads, roles))
         })
         .await??;
-    refused.retain(|local, rev| {
+    refused.retain(|local, r| {
         uploads
             .iter()
-            .any(|u| &u.local_id == local && u.rev == *rev)
+            .any(|u| &u.local_id == local && u.rev == r.rev)
     });
-    let pending = uploads.len();
     sh.status.update(|s| {
-        s.drafts_pending = pending;
+        set_waiting(s, &uploads);
+        s.drafts_refused = refused
+            .iter()
+            .map(|(id, r)| (id.clone(), r.reason.clone()))
+            .collect();
         if let Some(roles) = &roles {
             s.drafts_local_only = roles.drafts.is_none();
         }
     });
     let Some(job) = uploads
         .into_iter()
-        .find(|u| refused.get(&u.local_id) != Some(&u.rev))
+        .find(|u| refused.get(&u.local_id).is_none_or(|r| r.rev != u.rev))
     else {
         return Ok(Step::Idle);
     };
@@ -225,13 +260,14 @@ async fn upload(
     account: &Id,
     drafts: &Id,
     job: DraftUpload,
-    refused: &mut HashMap<String, i64>,
+    refused: &mut HashMap<String, Refusal>,
 ) -> Result<Step, SyncError> {
     let message: OutgoingMessage = match serde_json::from_value(job.payload.clone()) {
         Ok(m) => m,
         Err(e) => {
             tracing::warn!(error = %e, "a queued draft copy cannot be read");
-            refused.insert(job.local_id, job.rev);
+            let reason = format!("{DRAFT_COPY_ERROR}: the saved copy cannot be read");
+            refuse(sh, refused, job, reason);
             return Ok(Step::Progress);
         }
     };
@@ -292,7 +328,7 @@ async fn upload(
             let step = failed(sh, &e);
             if step == Step::Retry(Class::Permanent) {
                 tracing::warn!(error = %e, "the server refused a draft copy");
-                refused.insert(job.local_id, job.rev);
+                refuse(sh, refused, job, format!("{DRAFT_COPY_ERROR}: {e}"));
                 return Ok(Step::Progress);
             }
             return Ok(step);
@@ -345,10 +381,9 @@ async fn upload(
                 describe_set_error,
             );
             tracing::warn!(%error, "the server refused a draft copy");
-            sh.status.update(|s| {
-                s.last_error = Some(format!("{DRAFT_COPY_ERROR}: {error}"));
-            });
-            refused.insert(job.local_id, job.rev);
+            let reason = format!("{DRAFT_COPY_ERROR}: {error}");
+            sh.status.update(|s| s.last_error = Some(reason.clone()));
+            refuse(sh, refused, job, reason);
             Ok(Step::Progress)
         }
     }

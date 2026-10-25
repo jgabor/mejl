@@ -143,7 +143,7 @@ Fixed, each with tests:
 - Quitting while a message is in its undo-send window asks: Send now (default), Keep queued, Cancel send, Stay. `Q` quits at once. Send now waits up to 5 seconds.
 - `Ctrl-z` suspends from every context and redraws on resume. In the compose body, undo is `Ctrl-_`, `Ctrl-/` or `Ctrl-u`; redo is `Ctrl-y` or `Ctrl-r`.
 - Compose has its own body editor and stays fast at 5000 lines (p99 key to frame about 0.4 ms, was 10 ms).
-- Drafts are saved to the server (Drafts mailbox, `$draft`): at once on save key, close and blur, and at most every 10 seconds while typing. Without a Drafts mailbox they stay on the device and the compose line says so. A cancelled send saves the draft first.
+- Drafts are saved to the server (Drafts mailbox, `$draft`): at once on save key, close and blur, and at most every 10 seconds while typing. Without a Drafts mailbox they stay on the device and the compose line says so. A cancelled send saves the draft first. When the server refuses a draft, only that draft's compose line shows the reason and "on this device", until the draft changes.
 - "Open in browser" sanitizes the HTML with ammonia, in addition to the CSP. ammonia brings two MPL-2.0 crates (cssparser, dtoa-short), a user decision on 2026-10-25.
 - Mask descriptions are covered by the hostile-mail test. Copied text now has control and bidi characters removed.
 - `$EDITOR` pause waits for crossterm's reader to let go. The probe drains late replies. `caps.toml` and a small quirks table exist. Pty tests cover `enter`, `restore` and `suspend_*`.

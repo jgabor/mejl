@@ -661,3 +661,63 @@ fn a_cleanup_the_server_refuses_does_not_block_uploads() {
     assert_eq!(lookups, 1, "the refused cleanup was given up, not retried");
     h.shutdown();
 }
+
+/// Like [`save`], for any local draft.
+fn save_as(h: &Harness, token: u64, id: &str, subject: &str) {
+    h.handle.send(Command::Local {
+        token,
+        write: LocalWrite::SaveDraft(Box::new(local_draft(id, subject))),
+    });
+    let mut message = message(&h.server, subject);
+    message.draft_local_id = Some(id.into());
+    h.handle.send(Command::SaveDraftToServer {
+        local_id: id.into(),
+        message: Box::new(message),
+    });
+}
+
+#[test]
+fn a_refusal_stays_on_its_own_draft_until_it_changes() {
+    let h = Harness::start(FakeServer::demo(now()), quiet_setup());
+    h.synced();
+    *h.transport.refuse.lock().unwrap() = Some(("Too much".into(), 400));
+    save_as(&h, 1, "d1", "Too much");
+    wait_status(&h, "the refusal", |s| s.drafts_refused.contains_key("d1"));
+    let status = h.events.last_status().unwrap();
+    assert!(status.drafts_waiting.contains("d1"), "not on the server");
+    assert!(
+        status.drafts_refused["d1"].starts_with(mejl_sync::DRAFT_COPY_ERROR),
+        "{:?}",
+        status.drafts_refused
+    );
+
+    // Another draft uploads fine. Its success neither clears the refusal
+    // nor carries it.
+    save_as(&h, 2, "d2", "Fine");
+    h.wait_store("d2 copied", |r| {
+        r.draft("d2")
+            .unwrap()
+            .is_some_and(|d| d.server_email_id.is_some())
+    });
+    wait_status(&h, "d2 up", |s| {
+        s.online && !s.drafts_waiting.contains("d2")
+    });
+    let status = h.events.last_status().unwrap();
+    assert!(status.drafts_refused.contains_key("d1"), "{status:?}");
+    assert!(!status.drafts_refused.contains_key("d2"));
+
+    // A new version of the refused draft drops the refusal and uploads.
+    // The refusal held until here, so a later status without it is new.
+    let (refused_at, _) = h.events.wait_index(
+        0,
+        "the refusal",
+        |e| matches!(e, SyncEvent::Status(s) if s.drafts_refused.contains_key("d1")),
+    );
+    save_as(&h, 3, "d1", "Smaller");
+    wait_copy(&h, None);
+    h.events.wait_after(refused_at, "d1 up", |e| {
+        matches!(e, SyncEvent::Status(s)
+            if s.online && s.drafts_waiting.is_empty() && s.drafts_refused.is_empty())
+    });
+    h.shutdown();
+}

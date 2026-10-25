@@ -1,7 +1,7 @@
 //! Conversions between the store's and engine's types and the UI's view
 //! models. Everything here is pure, so it is tested without a store.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use jiff::Timestamp;
 use mejl_jmap::Id;
@@ -370,19 +370,28 @@ pub fn sync_status(s: &SyncStatus) -> ui::SyncStatus {
     ui::SyncStatus::Synced
 }
 
-/// Where drafts are kept, for compose. `held` counts server copies the app
-/// is still holding back (see the app's draft copy debounce), which the
-/// engine does not know about yet. Only an error about a draft copy is
-/// passed on; others belong to the main status line.
-pub fn draft_sync(s: &SyncStatus, held: usize) -> ui::DraftSync {
+/// Where drafts are kept, for compose. `held` names drafts whose server
+/// copy the app is still holding back (see the app's draft copy debounce),
+/// which the engine does not know about yet.
+pub fn draft_sync<'a>(
+    s: &SyncStatus,
+    held: impl Iterator<Item = &'a ui::DraftId>,
+) -> ui::DraftSync {
+    let mut waiting: BTreeSet<ui::DraftId> = s
+        .drafts_waiting
+        .iter()
+        .map(|id| ui::DraftId::from(id.as_str()))
+        .collect();
+    waiting.extend(held.cloned());
     ui::DraftSync {
-        pending: s.drafts_pending + held,
+        waiting,
+        refused: s
+            .drafts_refused
+            .iter()
+            .map(|(id, why)| (ui::DraftId::from(id.as_str()), why.clone()))
+            .collect(),
         local_only: s.drafts_local_only,
         online: s.online,
-        error: s
-            .last_error
-            .clone()
-            .filter(|e| e.starts_with(mejl_sync::DRAFT_COPY_ERROR)),
     }
 }
 
@@ -726,24 +735,25 @@ mod tests {
     }
 
     #[test]
-    fn draft_status_counts_held_copies_and_keeps_only_draft_errors() {
+    fn draft_status_adds_held_copies_and_keeps_refusals_per_draft() {
         let mut s = SyncStatus::default();
-        assert_eq!(draft_sync(&s, 0), ui::DraftSync::default());
+        assert_eq!(draft_sync(&s, [].iter()), ui::DraftSync::default());
         s.online = true;
-        s.drafts_pending = 1;
+        s.drafts_waiting.insert("d1".into());
+        s.drafts_refused.insert("d1".into(), "too big".into());
         s.last_error = Some("the network is down".into());
-        let d = draft_sync(&s, 2);
-        assert_eq!(d.pending, 3);
+        let held = [ui::DraftId::from("d2")];
+        let d = draft_sync(&s, held.iter());
+        let ids: Vec<&str> = d.waiting.iter().map(ui::DraftId::as_str).collect();
+        assert_eq!(ids, ["d1", "d2"]);
         assert!(d.online && !d.local_only);
-        assert_eq!(d.error, None, "not about drafts");
-        s.last_error = Some(format!("{}: too big", mejl_sync::DRAFT_COPY_ERROR));
-        s.drafts_local_only = true;
-        let d = draft_sync(&s, 0);
-        assert!(d.local_only);
         assert_eq!(
-            d.error.as_deref(),
-            Some("Cannot save the draft to the server: too big")
+            d.refused.get(&ui::DraftId::from("d1")).map(String::as_str),
+            Some("too big")
         );
+        assert!(!d.refused.contains_key(&ui::DraftId::from("d2")));
+        s.drafts_local_only = true;
+        assert!(draft_sync(&s, [].iter()).local_only);
     }
 
     #[test]

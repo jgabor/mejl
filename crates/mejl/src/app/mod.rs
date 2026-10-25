@@ -682,7 +682,7 @@ impl<B: Backend> App<B> {
             self.feed(Event::Msg(Msg::Error(e)));
         }
         self.flush_draft_copies(false);
-        let drafts = convert::draft_sync(&self.engine_status, self.draft_held.len());
+        let drafts = convert::draft_sync(&self.engine_status, self.draft_held.keys());
         if self.state.draft_sync() != &drafts {
             self.state.set_draft_sync(drafts);
         }
