@@ -1,0 +1,25 @@
+---
+source: crates/mejl-sieve/tests/render_golden.rs
+expression: block.text
+---
+# >>> mejl managed block v1 (do not edit by hand) >>>
+# mejl:rule id=r_18aa name="Newsletters" enabled=1
+if address :domain :is "from" "news.example.net" {
+  fileinto :mailboxid "M2a90" "INBOX.Newsletters";
+}
+# mejl:rule id=r_2c41 name="Receipts to folder" enabled=1
+if anyof (address :domain :is "from" "shop.example.com",
+          header :contains "subject" "receipt") {
+  addflag "\\Seen";
+  fileinto :mailboxid "M7d1e" "INBOX.Receipts";
+}
+# mejl:rule id=r_5d07 name="Garden club label" enabled=1
+if header :contains "list-id" "garden-club.example.org" {
+  fileinto :copy :mailboxid "M4c3b" "INBOX.Garden club";
+}
+# mejl:rule id=r_77e2 name="Old promo" enabled=0
+if false # address :domain :is "from" "promo.example.com"
+{
+  fileinto :specialuse "\\Trash" "INBOX.Trash";
+}
+# <<< mejl managed block v1 sha256=cfb73c46e5151e064db6ac5cb7df938c8ea24040d80d5fd7713c025f732a857d <<<

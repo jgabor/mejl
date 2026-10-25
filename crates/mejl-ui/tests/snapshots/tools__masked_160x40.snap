@@ -1,0 +1,44 @@
+---
+source: crates/mejl-ui/tests/tools.rs
+expression: hs.text()
+---
+ mejl   mira@example.org   Masked Email                                                                                                mask domain: example.org 
+┌─ Masked Email  14 addresses ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ 9 enabled   2 disabled   1 pending   2 deleted        1 silent for 6+ months   2 got spam                                                                    │
+│ Show 1 ✓ enabled  2 ✓ disabled  3 ✓ pending  4 ✓ deleted     5 silent: any   6 created by: any   sort: last message                                          │
+│ / search address, description or site                                                               default view hides pending and deleted, as Fastmail does │
+├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ state      address                        description         site                     last  created by   mail                                               │
+│▸✓ enabled  kettle.fern4821@example.org    Larkspur shop       shop.example.com        09:12  mejl           23                                               │
+│ ✓ enabled  bright.otter2207@example.org   Northgate Library   library.example.org     07:30  web            41                                               │
+│ ✓ enabled  sunny.flax1189@example.org     Tessellate Weekly   news.example.net          Thu  mejl          112                                               │
+│ ✗ disabled quiet.heron7731@example.org    Promo contest       win.example.net           Wed  web           312    !                                          │
+│ ✓ enabled  maple.drift5513@example.org    Kestrel Bank        bank.example.com          Tue  pw manager     64    !                                          │
+│ ✓ enabled  amber.loom3390@example.org     Harbor Dental       dental.example.com     Oct 16  mejl            9                                               │
+│ ✓ enabled  minty.cove3317@example.org     Wren Analytics      wren.example.com       Oct 14  mejl           30                                               │
+│ ✓ enabled  tidal.fig4402@example.org      Maple Street Co-op  coop.example.org        Oct 3  web            12                                               │
+│ ✓ enabled  violet.quay6641@example.org    Calder Insurance    insure.example.com     Sep 25  web            17                                               │
+│ ✗ disabled rusty.gale9024@example.org     Old forum           forum.example.net        4 mo  web            88                                               │
+│ ✓ enabled  pearl.moss7720@example.org     Conference 2025     conf.example.org        11 mo  web             6                                               │
+│ - deleted  hazel.brook5150@example.org    Breached shop       leaky.example.com        1 yr  web           204                                               │
+│ - deleted  stony.wick2815@example.org     Old phone plan      mobile.example.net       2 yr  web            51                                               │
+│ ◦ pending  cedar.pixel0408@example.org    (no description)    cabins.example.net      never  pw manager      0                                               │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+├─ kettle.fern4821@example.org ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│  name      Larkspur shop    ✓ enabled                                                                                                                        │
+│  site      https://shop.example.com    created 2025-03-14 by mejl    last mail 09:12                                                                         │
+│  mail      23 messages in the local index, 0 in Spam                                                                                                         │
+│  senders   help@shop.example.com (1), orders@shop.example.com (1)                                                                                            │
+│  check     ✓ every sender matches the site                                                                                                                   │
+│                                                                                                                                                              │
+│  e enable   x disable   D delete   r rename   Enter show messages   y copy address   R rule for this address                                                 │
+│                                                                                                                                                              │
+│  Disabled masks keep accepting mail and file it in Trash. Deleted masks bounce. Both can be set back to enabled.                                             │
+│                                                                                                                                                              │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+ 14 of 14 shown                                                                                                                          ✓ synced via JMAP push 
+ j/k move  / search  1-4 state filter  n new  e enable  x disable  D delete  r rename  Enter messages  y copy  ? help

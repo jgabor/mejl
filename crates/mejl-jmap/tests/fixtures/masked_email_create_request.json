@@ -1,0 +1,17 @@
+{
+  "using": ["urn:ietf:params:jmap:core", "https://www.fastmail.com/dev/maskedemail"],
+  "methodCalls": [
+    ["MaskedEmail/set", {
+      "accountId": "u1234abcd",
+      "create": {
+        "k1": {
+          "state": "enabled",
+          "forDomain": "https://shop.example",
+          "description": "Shop example newsletter",
+          "url": null,
+          "emailPrefix": "examplenews"
+        }
+      }
+    }, "s0"]
+  ]
+}

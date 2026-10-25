@@ -1,0 +1,44 @@
+---
+source: crates/mejl-ui/tests/screens.rs
+expression: hs.text()
+---
+ mejl   mira@example.org   Inbox  12 unread, 214 conversations                                                                         fastmail preset   ? help 
+┌─ Mailboxes ──────────┬─ Inbox ─────────────────────────────────────────────────────────────────┬─ Re: Garden club plot rota ─────────────────────────────────┐
+│▸Inbox             12 │ Today                                                                   ┃ 3 messages in Garden club                                   │
+│ Drafts             1 │ ◦   Juniper Tran (3)     Re: Garden club plot rota  Swapping Sa⋯  14:02 ┃                                                             │
+│ Sent                 │ ◦⚑  Owen Castillo        Draft budget for the hall repairs        13:47 ┃ ▸ Juniper Tran     Mon 10:14 Here is the rota for November⋯ │
+│ Archive              │ ◦ @ Larkspur Support (3) Re: Your order 48213 has shipped         09:12 ┃ ▸ Mira Holt (you)  Mon 18:40 Thanks! I cannot do the 7th, ⋯ │
+│ Spam               3 │     Lena Okafor (2)      Re: Thursday standup notes               08:55 ┃ ▾ Juniper Tran <juniper@garden.example.com>           14:02 │
+│ Trash                │   @ Northgate Library    Your reservation is ready to collect     07:30 │   to me, garden-club@example.org                            │
+│                      │ Yesterday                                                               │                                                             │
+│ Folders              │     Priya Raman (5)      Re: Trip to the coast in November          Thu │   Swapping Saturday works for me, can you take the 14th     │
+│ Newsletters        5 │   @ Tessellate Weekly    Issue 112: tiling window managers          Thu │   instead? Then Owen covers the 21st and we are set.        │
+│ Receipts             │  ⚑  Marco Bellini        Invoice 2026-118  Please find the invo⋯    Thu │                                                             │
+│ Projects             │ This week                                                               │   The compost delivery is on the 9th, so whoever is on      │
+│   Garden club      2 │     City Notices         Road closure on Elm Street, Oct 28         Wed │   that week please be there by 8. I will leave the shed     │
+│   Hall repairs       │     Dana Whitfield (2)   Re: Recipe for the plum cake               Wed │   key with Noor.                                            │
+│ Travel               │     Sam Ito              Photos from the climbing trip              Tue │                                                             │
+│                      │   @ Kestrel Bank         Your October statement is ready            Tue │   I have updated the shared rota[1].                        │
+│ Saved searches       │     Ravi Menon (4)       Re: Board game night  I can bring the ⋯    Mon │                                                             │
+│ VIPs, unread       1 │     Example Hosting      Renewal notice for example.org             Mon │   ⋯ 12 quoted lines from Mira Holt  (")                     │
+│ Masked, 7 days     4 │ Earlier                                                                 │                                                             │
+│ Has attachment       │     Grace Lindqvist      Quarterly newsletter draft              Oct 17 │   Juniper                                                   │
+│                      │   @ Harbor Dental        Appointment reminder: 3 November        Oct 16 │   ⋯ signature, 3 lines                                      │
+│ Tools                │     Felix Moreau (6)     Re: Moving the book club  Second Tuesd⋯ Oct 15 │                                                             │
+│ Rules            g r │   @ Wren Analytics       Weekly report: 3 new signups            Oct 14 │   [1] https://garden.example.com/rota                       │
+│ Masked Email     g m │     Juniper Tran         Seed order list  Final list attached. ⋯ Oct 12 │                                                             │
+│ Settings         g , │     Noor Haddad (2)      Re: Spare room this weekend?            Oct 10 │   r reply  a reply all  f forward  E expand all             │
+│                      │   @ Larkspur Outfitters  Receipt for order 47720  Thanks for sh⋯  Oct 8 │                                                             │
+│                      │     Theo Park            Slides from the meetup  Slides and the⋯  Oct 6 │            ┌─ .  mark ──────────────────────────────────────┤
+│                      │   @ Maple Street Co-op   Membership renewal  Your membership is⋯  Oct 3 │            │                                                │
+│                      │     Ines Duarte (3)      Re: Translation review  Two small fixe⋯  Oct 1 │            │ r  read                p  pin                  │
+│                      │     Owen Castillo        Hall booking calendar  Shared the cale⋯ Sep 29 │            │ u  unread              n  unpin                │
+│                      │     Bea Kowalski (2)     Re: Running club route  The river loop⋯ Sep 27 │            │                                                │
+│                      │   @ Calder Insurance     Policy documents  Your renewed policy ⋯ Sep 25 │            ├────────────────────────────────────────────────┤
+│                      │     Lena Okafor          Offsite agenda  Draft agenda for the o⋯ Sep 22 │            │ Esc cancel   no timeout: . does nothing alone  │
+│                      │     Pia Sorensen         Choir rehearsal moved  We are in the s⋯ Sep 20 │            │ Same popup for g go to  * select  b snooze     │
+│                      │     Hugo Brandt          Old flat deposit  The deposit came bac⋯ Sep 18 │            │                                                │
+│                      │     Grace Lindqvist      Allotment fees for next year            Sep 17 │            └────────────────────────────────────────────────┤
+└──────────────────────┴─────────────────────────────────────────────────────────────────────────┴─────────────────────────────────────────────────────────────┘
+                                                                                                                                                     pending: . 
+ . mark: press a key  Esc cancel  ? all keys

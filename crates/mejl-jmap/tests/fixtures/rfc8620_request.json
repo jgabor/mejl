@@ -1,0 +1,8 @@
+{
+  "using": [ "urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail" ],
+  "methodCalls": [
+    [ "method1", { "arg1": "arg1data", "arg2": "arg2data" }, "c1" ],
+    [ "method2", { "arg1": "arg1data" }, "c2" ],
+    [ "method3", {}, "c3" ]
+  ]
+}

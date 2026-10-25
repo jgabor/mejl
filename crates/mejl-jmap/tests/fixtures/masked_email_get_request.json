@@ -1,0 +1,6 @@
+{
+  "using": ["urn:ietf:params:jmap:core", "https://www.fastmail.com/dev/maskedemail"],
+  "methodCalls": [
+    ["MaskedEmail/get", { "accountId": "u1234abcd", "ids": null }, "g0"]
+  ]
+}

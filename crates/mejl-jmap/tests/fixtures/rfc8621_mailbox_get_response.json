@@ -1,0 +1,50 @@
+[ "Mailbox/get", {
+  "accountId": "u33084183",
+  "state": "78540",
+  "list": [{
+    "id": "MB23cfa8094c0f41e6",
+    "name": "Inbox",
+    "parentId": null,
+    "role": "inbox",
+    "sortOrder": 10,
+    "totalEmails": 16307,
+    "unreadEmails": 13905,
+    "totalThreads": 5833,
+    "unreadThreads": 5128,
+    "myRights": {
+      "mayAddItems": true,
+      "mayRename": false,
+      "maySubmit": true,
+      "mayDelete": false,
+      "maySetKeywords": true,
+      "mayRemoveItems": true,
+      "mayCreateChild": true,
+      "maySetSeen": true,
+      "mayReadItems": true
+    },
+    "isSubscribed": true
+  }, {
+    "id": "MB674cc24095db49ce",
+    "name": "Important mail",
+    "parentId": null,
+    "role": null,
+    "sortOrder": 1,
+    "totalEmails": 423,
+    "unreadEmails": 188,
+    "totalThreads": 213,
+    "unreadThreads": 167,
+    "myRights": {
+      "mayAddItems": true,
+      "mayRename": true,
+      "maySubmit": true,
+      "mayDelete": true,
+      "maySetKeywords": true,
+      "mayRemoveItems": true,
+      "mayCreateChild": true,
+      "maySetSeen": true,
+      "mayReadItems": true
+    },
+    "isSubscribed": true
+  }],
+  "notFound": []
+}, "0" ]

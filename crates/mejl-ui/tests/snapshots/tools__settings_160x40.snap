@@ -1,0 +1,44 @@
+---
+source: crates/mejl-ui/tests/tools.rs
+expression: hs.text()
+---
+ mejl   mira@example.org   Settings                                                                                                  written to the config file 
+┌─ Settings ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                                                              │
+│▸ Theme           terminal            terminal uses your terminal's colours; mono and high-contrast use none                                                  │
+│  Keys            fastmail            fastmail follows Fastmail's web shortcuts; vim follows aerc and vim                                                     │
+│  List density    comfortable         compact drops date headings; relaxed shows a preview line                                                               │
+│  Prefer HTML     off                 show the HTML part when a message has both; V switches per message                                                      │
+│  Undo send       10 s                how long a sent message waits so z can cancel it                                                                        │
+│  Remote images   off                 whether the browser view may load remote images                                                                         │
+│  Mark read       on open             how long a conversation is open before it is marked read                                                                │
+│  Archive reads   off                 archiving a conversation also marks it read; undo brings it back unread                                                 │
+│                                                                                                                                                              │
+│  Layout          auto   (set in the config file)                                                                                                             │
+│  Accessible mode off   (set in the config file)                                                                                                              │
+│  Hint bar        on   (set in the config file)                                                                                                               │
+│                                                                                                                                                              │
+│  Changes are written to the config file and apply at once.                                                                                                   │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+                                                                                                                                         ✓ synced via JMAP push 
+ j/k move  Enter change  Left/Right previous/next  Esc back  ? help

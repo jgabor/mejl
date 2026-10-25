@@ -1,0 +1,12 @@
+{
+  "using": ["urn:ietf:params:jmap:core", "https://www.fastmail.com/dev/maskedemail"],
+  "methodCalls": [
+    ["MaskedEmail/set", {
+      "accountId": "u1234abcd",
+      "update": {
+        "masked-123456": { "state": "disabled" },
+        "masked-777777": { "description": "Shop example (orders only)" }
+      }
+    }, "u0"]
+  ]
+}

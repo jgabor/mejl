@@ -1,0 +1,19 @@
+{
+  "using": ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail", "urn:ietf:params:jmap:submission"],
+  "methodCalls": [
+    ["Email/set", {"accountId": "u1", "create": {"d1": {
+      "mailboxIds": {"drafts-id": true},
+      "keywords": {"$draft": true, "$seen": true},
+      "from": [{"name": "Me", "email": "me@example.com"}],
+      "to": [{"email": "you@example.org"}],
+      "subject": "Hello",
+      "bodyValues": {"t": {"value": "Hi there"}},
+      "textBody": [{"partId": "t", "type": "text/plain"}]
+    }}}, "0"],
+    ["EmailSubmission/set", {"accountId": "u1",
+      "create": {"s1": {"identityId": "identity-id", "emailId": "#d1"}},
+      "onSuccessUpdateEmail": {"#s1": {
+        "mailboxIds/drafts-id": null, "mailboxIds/sent-id": true, "keywords/$draft": null}}
+    }, "1"]
+  ]
+}

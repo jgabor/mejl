@@ -1,0 +1,21 @@
+---
+source: crates/mejl-render/tests/render.rs
+expression: "dump(&render_plain(text, &opts(12)))"
+---
+width 12 | source Plain | remote images 0 | trackers 0 | truncated false | fallback false
+--- lines
+  0 |日本語のテキ
+  1 |ストは全角で
+  2 |表示されます
+  3 |。折り返しは
+  4 |二桁の幅を守
+  5 |ります。
+  6 |Family 👨‍👩‍👧
+  7 |flags 🇸🇪🇯🇵
+  8 |thumbs 👍🏽
+  9 |heart ❤️
+ 10 |accents ééé
+ 11 |中文混合Engl
+ 12 |ish文本测试
+--- folds
+--- links

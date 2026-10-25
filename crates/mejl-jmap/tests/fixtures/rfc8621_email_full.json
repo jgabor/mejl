@@ -1,0 +1,41 @@
+{
+  "id": "Mf40b2b4b2a8d4c5a",
+  "blobId": "Bf40b2b4b2a8d4c5a",
+  "threadId": "Tf40b2b4b2a8d4c5a",
+  "mailboxIds": { "MB23cfa8094c0f41e6": true },
+  "keywords": { "$seen": true, "$flagged": true },
+  "size": 3405,
+  "receivedAt": "2014-10-30T06:12:00Z",
+  "messageId": [ "1234567890.abc@mail.example.org" ],
+  "inReplyTo": null,
+  "references": null,
+  "sender": null,
+  "from": [ { "name": "Robin Example", "email": "robin@example.org" } ],
+  "to": [ { "name": null, "email": "kim@example.net" } ],
+  "cc": [],
+  "bcc": null,
+  "replyTo": null,
+  "subject": "Holiday photos",
+  "sentAt": "2014-10-30T14:12:00+08:00",
+  "headers": [
+    { "name": "Subject", "value": " Holiday photos" },
+    { "name": "X-FM-Masked-Email", "value": " masked-123456" }
+  ],
+  "header:X-FM-Masked-Email:asText": "masked-123456",
+  "header:Fastmail-MaskedEmail:asText": null,
+  "bodyStructure": {
+    "partId": null,
+    "type": "multipart/mixed",
+    "subParts": [
+      { "partId": "1", "blobId": "Bp1", "size": 120, "type": "text/plain", "charset": "utf-8", "disposition": null },
+      { "partId": "2", "blobId": "Bp2", "size": 2900, "type": "image/jpeg", "name": "beach.jpg", "disposition": "attachment", "cid": null, "language": null, "location": null }
+    ]
+  },
+  "textBody": [ { "partId": "1", "blobId": "Bp1", "size": 120, "type": "text/plain" } ],
+  "htmlBody": [ { "partId": "1", "blobId": "Bp1", "size": 120, "type": "text/plain" } ],
+  "attachments": [ { "partId": "2", "blobId": "Bp2", "size": 2900, "type": "image/jpeg", "name": "beach.jpg" } ],
+  "bodyValues": { "1": { "value": "Photos attached.", "isEncodingProblem": false, "isTruncated": false } },
+  "hasAttachment": true,
+  "preview": "Photos attached.",
+  "x-future-property": { "nested": [1, 2, 3] }
+}

@@ -1,0 +1,38 @@
+[ "ContactCard/get", {
+  "accountId": "A1",
+  "state": "c-1",
+  "list": [
+    {
+      "@type": "Card",
+      "version": "1.0",
+      "id": "C1",
+      "uid": "urn:uuid:5e7a2c64-6c2a-4fd1-9b9c-0d3b5d1e2f10",
+      "addressBookIds": { "AB1": true },
+      "kind": "individual",
+      "name": {
+        "components": [
+          { "kind": "given", "value": "Robin" },
+          { "kind": "surname", "value": "Example" }
+        ],
+        "isOrdered": true
+      },
+      "emails": {
+        "e1": { "address": "robin@example.org", "contexts": { "work": true }, "pref": 1 },
+        "e2": { "address": "robin.home@example.net" }
+      },
+      "phones": { "p1": { "number": "+1-555-0100", "features": { "voice": true } } }
+    },
+    {
+      "@type": "Card",
+      "version": "1.0",
+      "id": "C2",
+      "uid": "urn:uuid:9b1f6c1e-7a5a-4d35-8a59-2d1c7b9e4a01",
+      "kind": "group",
+      "name": { "full": "Book club" },
+      "members": {
+        "urn:uuid:5e7a2c64-6c2a-4fd1-9b9c-0d3b5d1e2f10": true
+      }
+    }
+  ],
+  "notFound": []
+}, "0" ]

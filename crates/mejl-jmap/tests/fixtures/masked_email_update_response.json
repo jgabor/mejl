@@ -1,0 +1,7 @@
+["MaskedEmail/set", {
+  "accountId": "u1234abcd",
+  "oldState": null,
+  "newState": null,
+  "updated": { "masked-123456": null, "masked-777777": null },
+  "notUpdated": null
+}, "u0"]

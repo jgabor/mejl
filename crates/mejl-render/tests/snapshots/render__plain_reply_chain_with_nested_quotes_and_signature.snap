@@ -1,0 +1,46 @@
+---
+source: crates/mejl-render/tests/render.rs
+expression: dump(&body)
+---
+width 60 | source Plain | remote images 0 | trackers 0 | truncated false | fallback false
+--- lines
+  0 |Swapping Saturday works for me, can you take the 14th
+  1 |instead? Then Owen covers the 21st and we are set.
+  2 |
+  3 |The compost delivery is on the 9th, so whoever is on that
+  4 |week please be there by 8. I will leave the shed key with
+  5 |Noor.
+  6 |
+  7 |I have updated the shared rota
+  8 |{l1:https://garden.example.com/rota}{m1:[1]}.
+  9 |
+ 10 |Juniper
+ 11 |{s:--}
+ 12 |{s:Juniper Tran}
+ 13 |{s:Garden club secretary}
+ 14 |{s:Plot 7, Allotment Lane}
+ 15 |
+ 16 |On Mon, Oct 19, 2026 at 6:40 PM Mira Holt <mira@example.org>
+ 17 |wrote:
+ 18 |{q1:> Thanks! I cannot do the 7th, could someone swap with me?}
+ 19 |{q1:> I am happy to take any Saturday in exchange.}
+ 20 |{q1:>}
+ 21 |{q1:> On Mon, Oct 19, 2026 at 10:14 AM Juniper Tran}
+ 22 |{q1:> <juniper@garden.example.com> wrote:}
+ 23 |{q2:>> Here is the rota for November, plots 1 to 12 are listed.}
+ 24 |{q2:>> Each plot holder covers one Saturday.}
+ 25 |{q2:>>}
+ 26 |{q3:>>> Owen asked whether the water butts are emptied in}
+ 27 |{q3:>>> winter.}
+ 28 |{q3:>>> They are, at the end of the month.}
+ 29 |{q2:>>}
+ 30 |{q2:>> Juniper}
+ 31 |{q1:>}
+ 32 |{q1:> Mira}
+ 33 |
+ 34 |{m1:[1] }{l1:https://garden.example.com/rota}
+--- folds
+Signature lines 11..15: signature, 3 lines
+Quote lines 16..33: 15 quoted lines from Mira Holt, Oct 19
+--- links
+[1] https://garden.example.com/rota | https://garden.example.com/rota

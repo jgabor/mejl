@@ -1,0 +1,28 @@
+---
+source: crates/mejl-ui/tests/tools.rs
+expression: hs.text()
+---
+ mejl   Rules (Sieve)                    mejl block v2   last copied v1, Oct 20 
+┌─ Rules ──────────────────────────────────────────────────────────────────────┐
+│ ! Paste required. Fastmail has no public API for rules or Sieve, so mejl can │
+│  The mejl block changed since you last copied it (v1, Oct 20, 3 changes). P⋯ │
+├─ mejl rules (4) ─────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ✓ Newsletters                                                               │
+│▸ ✓ Receipts to folder                                                    *   │
+│  ✓ Garden club label                                                     *   │
+│  ✗ Old promo                                                           off   │
+│                                                                              │
+│  * changed since last copy                                                   │
+│  n new  J/K order  Space on/off                                              │
+│                                                                              │
+├─ Fastmail UI rules ──────────────────────────────────────────────────────────┤
+│  Not readable by mejl: there is no                                           │
+│  public rules API. Edit them in                                              │
+│  Fastmail: Settings > Filters & Rules                                        │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+ Rules saved locally.  3 changes not on Fastmail yet.                           
+ n new  Enter edit  Space on/off  J/K reorder  t try  P copy  Esc back  ? help

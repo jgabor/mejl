@@ -1,0 +1,26 @@
+[package]
+name = "mejl-sync"
+description = "The mejl sync engine: session, cold and warm sync, push, outbox flusher, bodies, sending, server search and Masked Email"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+mejl-jmap.workspace = true
+mejl-store.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+futures.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+jiff.workspace = true
+bytes.workspace = true
+mime_guess.workspace = true
+
+[dev-dependencies]
+mejl-fake.workspace = true
+tempfile.workspace = true

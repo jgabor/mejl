@@ -1,0 +1,19 @@
+[package]
+name = "mejl-render"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Message body to semantic styled lines: html2text, link footnotes, quote and signature folding"
+
+[dependencies]
+ammonia.workspace = true
+html2text.workspace = true
+linkify.workspace = true
+serde.workspace = true
+unicode-segmentation.workspace = true
+unicode-width.workspace = true
+
+[dev-dependencies]
+insta.workspace = true

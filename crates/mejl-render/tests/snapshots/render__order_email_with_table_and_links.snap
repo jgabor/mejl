@@ -1,0 +1,52 @@
+---
+source: crates/mejl-render/tests/render.rs
+expression: dump(&body)
+---
+width 72 | source Html | remote images 1 | trackers 1 | truncated false | fallback false
+--- lines
+  0 |{.:[image: Larkspur Outfitters]}
+  1 |
+  2 |{h:Order update}
+  3 |
+  4 |Hi Mira,
+  5 |
+  6 |Good news: we changed the delivery address and your order has shipped.
+  7 |You can follow the parcel with the link below.
+  8 |
+  9 |{l1:[ Track your parcel ]}{m1:[1]}
+ 10 |
+ 11 |{r:───────────────────────────┬───┬─────}
+ 12 |Item                       {r:│}Qty{r:│}Price
+ 13 |{r:───────────────────────────┼───┼─────}
+ 14 |Merino hiking socks, 2-pack{r:│}1  {r:│}18.00
+ 15 |{r:───────────────────────────┼───┼─────}
+ 16 |Trail bottle, 750 ml       {r:│}2  {r:│}24.00
+ 17 |{r:───────────────────────────┼───┼─────}
+ 18 |Delivery                   {r:│}   {r:│}0.00
+ 19 |{r:───────────────────────────┼───┼─────}
+ 20 |{*:Total}                      {r:│}   {r:│}{*:42.00}
+ 21 |{r:───────────────────────────┴───┴─────}
+ 22 |
+ 23 |Questions? Reply to this email or visit our {l2:help centre}{m2:[2]}.
+ 24 |
+ 25 |{l3:Manage your email preferences}{m3:[3]}.
+ 26 |
+ 27 |On Wed, Oct 21, 2026 at 8:31 AM Mira Holt <mira@example.org> wrote:
+ 28 |
+ 29 |{q1:> Hi,}
+ 30 |{q1:> could you ship to my work address instead? It is 4 Quay Road,}
+ 31 |{q1:> Harbourside.}
+ 32 |{q1:> The office is open from 8 to 5 on weekdays, and the front desk can}
+ 33 |{q1:> sign for parcels.}
+ 34 |{q1:> Thanks,}
+ 35 |{q1:> Mira}
+ 36 |
+ 37 |{m1:[1] }{l1:https://shop.example.com/track/48213}
+ 38 |{m2:[2] }{l2:https://shop.example.com/help}
+ 39 |{m3:[3] }{l3:https://shop.example.com/preferences}
+--- folds
+Quote lines 27..36: 7 quoted lines from Mira Holt, Oct 21
+--- links
+[1] https://shop.example.com/track/48213 | [ Track your parcel ]
+[2] https://shop.example.com/help | help centre
+[3] https://shop.example.com/preferences | Manage your email preferences

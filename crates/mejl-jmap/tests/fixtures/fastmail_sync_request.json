@@ -1,0 +1,18 @@
+{
+  "using": ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+  "methodCalls": [
+    ["Mailbox/changes", {"accountId": "u1", "sinceState": "M1"}, "m"],
+    ["Email/changes", {"accountId": "u1", "sinceState": "E1", "maxChanges": 500}, "e"],
+    ["Email/get", {"accountId": "u1",
+      "#ids": {"resultOf": "e", "name": "Email/changes", "path": "/created"},
+      "properties": ["threadId", "mailboxIds", "keywords", "from", "subject", "receivedAt", "preview"]}, "ec"],
+    ["Email/get", {"accountId": "u1",
+      "#ids": {"resultOf": "e", "name": "Email/changes", "path": "/updated"},
+      "properties": ["mailboxIds", "keywords"]}, "eu"],
+    ["Thread/changes", {"accountId": "u1", "sinceState": "T1"}, "t"],
+    ["Email/queryChanges", {"accountId": "u1",
+      "filter": {"inMailbox": "inbox-id"},
+      "sort": [{"property": "receivedAt", "isAscending": false}],
+      "collapseThreads": true, "sinceQueryState": "Q1"}, "q"]
+  ]
+}

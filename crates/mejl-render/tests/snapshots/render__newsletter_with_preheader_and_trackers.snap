@@ -1,0 +1,27 @@
+---
+source: crates/mejl-render/tests/render.rs
+expression: dump(&body)
+---
+width 64 | source Html | remote images 3 | trackers 3 | truncated false | fallback false
+--- lines
+  0 |{l1.:[image: Seedling Weekly]}{m1:[1]}
+  1 |{h:Autumn planting guide}
+  2 |
+  3 |Now is the time to get {*:spring bulbs} in the ground. Our {/:five step}
+  4 |guide covers depth, spacing and which bulbs squirrels leave
+  5 |alone.
+  6 |
+  7 |{l1:Read the guide}{m1:[1]}
+  8 |{.:[image:}        Crocus
+  9 |{.:Tulips]}
+ 10 |
+ 11 |Tulips
+ 12 |You are receiving this because you signed up at
+ 13 |news.example.net. {l2:Unsubscribe}{m2:[2]} or do nothing.
+ 14 |
+ 15 |{m1:[1] }{l1:https://news.example.net/c/abc123?utm_source=email}
+ 16 |{m2:[2] }{l2:https://news.example.net/unsubscribe?id=9f8e7d}
+--- folds
+--- links
+[1] https://news.example.net/c/abc123?utm_source=email | [image: Seedling Weekly]
+[2] https://news.example.net/unsubscribe?id=9f8e7d | Unsubscribe

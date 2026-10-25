@@ -1,0 +1,40 @@
+---
+source: crates/mejl-ui/tests/screens.rs
+expression: hs.text()
+---
+ mejl   mira@example.org   Inbox ▾  12 unread                                                  fastmail preset   ? help 
+┌─ Mailboxes ──────────┬──────────────────────────────────┬─ Re: Garden club plot rota ────────────────────────────────┐
+│▸Inbox             12 │                                  ┃ 3 messages in Garden club                                  │
+│ Drafts             1 │e: Garden club plot rota    14:02 ┃                                                            │
+│ Sent                 │raft budget for the hall ⋯  13:47 ┃ ▸ Juniper Tran     Mon 10:14 Here is the rota for Novembe⋯ │
+│ Archive              │e: Your order 48213 has s⋯  09:12 │ ▸ Mira Holt (you)  Mon 18:40 Thanks! I cannot do the 7th,⋯ │
+│ Spam               3 │e: Thursday standup notes   08:55 │ ▾ Juniper Tran <juniper@garden.example.com>          14:02 │
+│ Trash                │our reservation is ready ⋯  07:30 │   to me, garden-club@example.org                           │
+│                      │                                  │                                                            │
+│ Folders              │e: Trip to the coast in N⋯    Thu │   Swapping Saturday works for me, can you take the 14th    │
+│ Newsletters        5 │ssue 112: tiling window m⋯    Thu │   instead? Then Owen covers the 21st and we are set.       │
+│ Receipts             │nvoice 2026-118               Thu │                                                            │
+│ Projects             │                                  │   The compost delivery is on the 9th, so whoever is on     │
+│   Garden club      2 │oad closure on Elm Street⋯    Wed │   that week please be there by 8. I will leave the shed    │
+│   Hall repairs       │e: Recipe for the plum ca⋯    Wed │   key with Noor.                                           │
+│ Travel               │hotos from the climbing t⋯    Tue │                                                            │
+│                      │our October statement is ⋯    Tue │   I have updated the shared rota[1].                       │
+│ Saved searches       │e: Board game night           Mon │                                                            │
+│ VIPs, unread       1 │enewal notice for example⋯    Mon │   ⋯ 12 quoted lines from Mira Holt  (")                    │
+│ Masked, 7 days     4 │                                  │                                                            │
+│ Has attachment       │uarterly newsletter draft  Oct 17 │   Juniper                                                  │
+│                      │ppointment reminder: 3 No⋯ Oct 16 │   ⋯ signature, 3 lines                                     │
+│ Tools                │e: Moving the book club    Oct 15 │                                                            │
+│ Rules            g r │eekly report: 3 new signu⋯ Oct 14 │   [1] https://garden.example.com/rota                      │
+│ Masked Email     g m │eed order list             Oct 12 │                                                            │
+│ Settings         g , │e: Spare room this weeken⋯ Oct 10 │   r reply  a reply all  f forward  E expand all            │
+│                      │eceipt for order 47720      Oct 8 │                                                            │
+│                      │lides from the meetup       Oct 6 │                                                            │
+│                      │embership renewal           Oct 3 │                                                            │
+│                      │e: Translation review       Oct 1 │                                                            │
+│                      │all booking calendar       Sep 29 │                                                            │
+│                      │e: Running club route      Sep 27 │                                                            │
+│                      │olicy documents            Sep 25 │                                                            │
+└──────────────────────┴──────────────────────────────────┴────────────────────────────────────────────────────────────┘
+                                                                                       ✓ synced via JMAP push  14:02:31 
+ j/k move  o open  Tab next pane  u back  ? help

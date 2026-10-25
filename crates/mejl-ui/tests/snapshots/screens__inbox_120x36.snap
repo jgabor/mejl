@@ -1,0 +1,40 @@
+---
+source: crates/mejl-ui/tests/screens.rs
+expression: hs.text()
+---
+ mejl   mira@example.org   Inbox ▾  12 unread                                                  fastmail preset   ? help 
+┌─ Inbox  12 unread ──────────────────────────────────────┬─ Re: Garden club plot rota ────────────────────────────────┐
+│ Today                                                   ┃ 3 messages in Garden club                                  │
+│ ◦   Juniper Tran (3) Re: Garden club plot rota    14:02 ┃                                                            │
+│ ◦⚑  Owen Castillo    Draft budget for the hall ⋯  13:47 ┃ ▸ Juniper Tran     Mon 10:14 Here is the rota for Novembe⋯ │
+│ ◦ @ Larkspur Suppor⋯ Re: Your order 48213 has s⋯  09:12 │ ▸ Mira Holt (you)  Mon 18:40 Thanks! I cannot do the 7th,⋯ │
+│     Lena Okafor (2)  Re: Thursday standup notes   08:55 │ ▾ Juniper Tran <juniper@garden.example.com>          14:02 │
+│   @ Northgate Libra⋯ Your reservation is ready ⋯  07:30 │   to me, garden-club@example.org                           │
+│ Yesterday                                               │                                                            │
+│     Priya Raman (5)  Re: Trip to the coast in N⋯    Thu │   Swapping Saturday works for me, can you take the 14th    │
+│   @ Tessellate Week⋯ Issue 112: tiling window m⋯    Thu │   instead? Then Owen covers the 21st and we are set.       │
+│  ⚑  Marco Bellini    Invoice 2026-118               Thu │                                                            │
+│ This week                                               │   The compost delivery is on the 9th, so whoever is on     │
+│     City Notices     Road closure on Elm Street⋯    Wed │   that week please be there by 8. I will leave the shed    │
+│     Dana Whitfield ⋯ Re: Recipe for the plum ca⋯    Wed │   key with Noor.                                           │
+│     Sam Ito          Photos from the climbing t⋯    Tue │                                                            │
+│   @ Kestrel Bank     Your October statement is ⋯    Tue │   I have updated the shared rota[1].                       │
+│     Ravi Menon (4)   Re: Board game night           Mon │                                                            │
+│     Example Hosting  Renewal notice for example⋯    Mon │   ⋯ 12 quoted lines from Mira Holt  (")                    │
+│ Earlier                                                 │                                                            │
+│     Grace Lindqvist  Quarterly newsletter draft  Oct 17 │   Juniper                                                  │
+│   @ Harbor Dental    Appointment reminder: 3 No⋯ Oct 16 │   ⋯ signature, 3 lines                                     │
+│     Felix Moreau (6) Re: Moving the book club    Oct 15 │                                                            │
+│   @ Wren Analytics   Weekly report: 3 new signu⋯ Oct 14 │   [1] https://garden.example.com/rota                      │
+│     Juniper Tran     Seed order list             Oct 12 │                                                            │
+│     Noor Haddad (2)  Re: Spare room this weeken⋯ Oct 10 │   r reply  a reply all  f forward  E expand all            │
+│   @ Larkspur Outfit⋯ Receipt for order 47720      Oct 8 │                                                            │
+│     Theo Park        Slides from the meetup       Oct 6 │                                                            │
+│   @ Maple Street Co⋯ Membership renewal           Oct 3 │                                                            │
+│     Ines Duarte (3)  Re: Translation review       Oct 1 │                                                            │
+│     Owen Castillo    Hall booking calendar       Sep 29 │                                                            │
+│     Bea Kowalski (2) Re: Running club route      Sep 27 │                                                            │
+│   @ Calder Insurance Policy documents            Sep 25 │                                                            │
+└─────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────┘
+                                                                                       ✓ synced via JMAP push  14:02:31 
+ j/k move  o open  x select  y archive  d trash  s pin  m move to  r reply  / search  : commands  g go  ? help

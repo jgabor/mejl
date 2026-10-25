@@ -1,0 +1,34 @@
+{
+  "methodResponses": [
+    ["MaskedEmail/get", {
+      "accountId": "u1234abcd",
+      "state": "",
+      "list": [
+        {
+          "id": "masked-123456",
+          "email": "flighty.emu5803@example.com",
+          "state": "enabled",
+          "forDomain": "https://news.example.org",
+          "description": "Hacker News",
+          "url": null,
+          "createdBy": "mejl",
+          "createdAt": "2026-10-01T09:12:44Z",
+          "lastMessageAt": "2026-10-22T18:03:10Z"
+        },
+        {
+          "id": "masked-654321",
+          "email": "brisk.otter2210@example.com",
+          "state": "deleted",
+          "forDomain": "",
+          "description": "Old shop",
+          "url": null,
+          "createdBy": "",
+          "createdAt": "2023-03-14T08:00:00Z",
+          "lastMessageAt": "2024-01-02T10:00:00Z"
+        }
+      ],
+      "notFound": []
+    }, "g0"]
+  ],
+  "sessionState": "cyrus-0;p-0"
+}

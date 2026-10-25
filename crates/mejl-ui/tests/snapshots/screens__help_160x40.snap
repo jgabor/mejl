@@ -1,0 +1,44 @@
+---
+source: crates/mejl-ui/tests/screens.rs
+expression: hs.text()
+---
+ mejl   mira@example.org   Inbox  12 unread, 214 conversations                                                                         fastmail preset   ? help 
+┌─ Mailboxes ──────────┬─ Inbox ─────────────────────────────────────────────────────────────────┬─ Re: Garden club plot rota ─────────────────────────────────┐
+│▸Inbox             12 │ Today          ┌─ Keys: list ─────────────────────────────────────────────────────────────────┐club                                   │
+│ Drafts             1 │ ◦   Juniper Tra│ / type to filter                                                             │                                       │
+│ Sent                 │ ◦⚑  Owen Castil├──────────────────────────────────────────────────────────────────────────────┤n 10:14 Here is the rota for November⋯ │
+│ Archive              │ ◦ @ Larkspur Su│ Move                                                                         │n 18:40 Thanks! I cannot do the 7th, ⋯ │
+│ Spam               3 │     Lena Okafor│ j, Down        Next conversation, or next item                          next │er@garden.example.com>           14:02 │
+│ Trash                │   @ Northgate L│ k, Up          Previous conversation, or previous item                  prev │example.org                            │
+│                      │ Yesterday      │ o, Enter       Open the conversation or mailbox under the cursor        open │                                       │
+│ Folders              │     Priya Raman│ Space, PgDn    Scroll one page down                                page-down │orks for me, can you take the 14th     │
+│ Newsletters        5 │   @ Tessellate │ PgUp           Scroll one page up                                    page-up │covers the 21st and we are set.        │
+│ Receipts             │  ⚑  Marco Belli│ ^d             Scroll half a page down                        half-page-down │                                       │
+│ Projects             │ This week      │ ^u             Scroll half a page up                            half-page-up │y is on the 9th, so whoever is on      │
+│   Garden club      2 │     City Notice│ G, End         Jump to the last conversation                       go-bottom │ there by 8. I will leave the shed     │
+│   Hall repairs       │     Dana Whitfi│                                                                              │                                       │
+│ Travel               │     Sam Ito    │ Go to                                                                        │                                       │
+│                      │   @ Kestrel Ban│ Home, g g      Jump to the first conversation                         go-top │shared rota[1].                        │
+│ Saved searches       │     Ravi Menon │ g i            Go to the inbox                                      go-inbox │                                       │
+│ VIPs, unread       1 │     Example Hos│ g a            Go to the archive                                  go-archive │rom Mira Holt  (")                     │
+│ Masked, 7 days     4 │ Earlier        │ g s            Go to sent mail                                       go-sent │                                       │
+│ Has attachment       │     Grace Lindq│ g d            Go to drafts                                        go-drafts │                                       │
+│                      │   @ Harbor Dent│ g t            Go to trash                                          go-trash │s                                      │
+│ Tools                │     Felix Morea│ g j            Go to spam                                            go-spam │                                       │
+│ Rules            g r │   @ Wren Analyt│ g f            Pick a mailbox from the list                       go-mailbox │example.com/rota                       │
+│ Masked Email     g m │     Juniper Tra│                                                                              │                                       │
+│ Settings         g , │     Noor Haddad│ mejl tools                                                                   │l  f forward  E expand all             │
+│                      │   @ Larkspur Ou│ g r            Open the rules manager                               go-rules │                                       │
+│                      │     Theo Park  │ g ,            Open settings                                     go-settings │                                       │
+│                      │   @ Maple Stree│ g m            Open the Masked Email manager                       go-masked │                                       │
+│                      │     Ines Duarte│ g p            Show frame timings                                       perf │                                       │
+│                      │     Owen Castil│                                                                              │                                       │
+│                      │     Bea Kowalsk│ Select                                                                       │                                       │
+│                      │   @ Calder Insu│ x              Select or deselect the conversation                    select │                                       │
+│                      │     Lena Okafor│ X              Select from the last selected row to the cursor  select-range │                                       │
+│                      │     Pia Sorense│ * a            Select every conversation in the mailbox           select-all │                                       │
+│                      │     Hugo Brandt│ * n            Clear the selection                               select-none │                                       │
+│                      │     Grace Lindq└──────────────────────────────────────────────────────────────────────────────┘                                       │
+└──────────────────────┴─────────────────────────────────────────────────────────────────────────┴─────────────────────────────────────────────────────────────┘
+                                                                                                                               ✓ synced via JMAP push  14:02:31 
+ type to filter  Up/Down scroll  Esc close

@@ -1,0 +1,44 @@
+---
+source: crates/mejl-ui/tests/palette.rs
+expression: hs.text()
+---
+ mejl   mira@example.org   Inbox  12 unread, 214 conversations                                                                         fastmail preset   ? help 
+┌─ Mailboxes ──────────┬─ Inbox ─────────────────────────────────────────────────────────────────┬─ Re: Garden club plot rota ─────────────────────────────────┐
+│▸Inbox             12 │ Today                                                                   ┃ 3 messages in Garden club                                   │
+│ Drafts             1 │ ◦   Juniper Tran (3)     Re: Garden club plot rota  Swapping Sa⋯  14:02 ┃                                                             │
+│ Sent                 │ ◦⚑  Owen Cast┌─ Commands ──────────────────────────────────────────────────────── : or Ctrl-k ──┐10:14 Here is the rota for November⋯ │
+│ Archive              │ ◦ @ Larkspur │ > go                                                                             │18:40 Thanks! I cannot do the 7th, ⋯ │
+│ Spam               3 │     Lena Okaf├──────────────────────────────────────────────────────────────────────────────────┤@garden.example.com>           14:02 │
+│ Trash                │   @ Northgate│ ▸ Go back one level: close an overlay, leave the r⋯ u         app                │ample.org                            │
+│                      │ Yesterday    │   Go back, or quit at the top level                 q         app                │                                     │
+│ Folders              │     Priya Ram│   Go to the inbox                                   g i       go to              │ks for me, can you take the 14th     │
+│ Newsletters        5 │   @ Tessellat│   Go to the archive                                 g a       go to              │vers the 21st and we are set.        │
+│ Receipts             │  ⚑  Marco Bel│   Go to sent mail                                   g s       go to              │                                     │
+│ Projects             │ This week    │   Go to drafts                                      g d       go to              │is on the 9th, so whoever is on      │
+│   Garden club      2 │     City Noti│   Go to trash                                       g t       go to              │here by 8. I will leave the shed     │
+│   Hall repairs       │     Dana Whit│   Go to spam                                        g j       go to              │                                     │
+│ Travel               │     Sam Ito  │   Go to: Inbox                                      g f       mailbox            │                                     │
+│                      │   @ Kestrel B│   Go to: Drafts                                     g f       mailbox            │ared rota[1].                        │
+│ Saved searches       │     Ravi Meno│   Go to: Sent                                       g f       mailbox            │                                     │
+│ VIPs, unread       1 │     Example H│   Go to: Archive                                    g f       mailbox            │m Mira Holt  (")                     │
+│ Masked, 7 days     4 │ Earlier      │   Go to: Spam                                       g f       mailbox            │                                     │
+│ Has attachment       │     Grace Lin│   Go to: Trash                                      g f       mailbox            │                                     │
+│                      │   @ Harbor De│   Go to: Newsletters                                g f       mailbox            │                                     │
+│ Tools                │     Felix Mor│   Go to: Receipts                                   g f       mailbox            │                                     │
+│ Rules            g r │   @ Wren Anal│   Go to: Projects                                   g f       mailbox            │ample.com/rota                       │
+│ Masked Email     g m │     Juniper T│   Go to: Garden club                                g f       mailbox            │                                     │
+│ Settings         g , │     Noor Hadd│   Go to: Hall repairs                               g f       mailbox            │ f forward  E expand all             │
+│                      │   @ Larkspur │   Go to: Travel                                     g f       mailbox            │                                     │
+│                      │     Theo Park│   Archive, then go to the previous conversation     [         triage             │                                     │
+│                      │   @ Maple Str│   Archive, then go to the next conversation         ]         triage             │                                     │
+│                      │     Ines Duar│   Pick a mailbox from the list                      g f       go to              │                                     │
+│                      │     Owen Cast│   Jump to the first conversation                    Home      go to              │                                     │
+│                      │     Bea Kowal│   Contact: Grace Lindqvist <grace.lindqvist@exampl⋯           contact            │                                     │
+│                      │   @ Calder In│                                                                                  │                                     │
+│                      │     Lena Okaf├──────────────────────────────────────────────────────────────────────────────────┤                                     │
+│                      │     Pia Soren│ Each row shows its key, so the palette teaches the shortcuts.                    │                                     │
+│                      │     Hugo Bran│ Also searches: mailboxes, saved searches, contacts, rules, masked addresses.     │                                     │
+│                      │     Grace Lin└──────────────────────────────────────────────────────────────────────────────────┘                                     │
+└──────────────────────┴─────────────────────────────────────────────────────────────────────────┴─────────────────────────────────────────────────────────────┘
+ 26 of 119 commands match "go"                                                                                                           ✓ synced via JMAP push 
+ Up/Down move  Enter run  Tab complete  ^n/^p next/prev  Esc close

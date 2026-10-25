@@ -1,0 +1,1444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mejl UI mock-ups</title>
+<meta name="description" content="Terminal UI mock-ups for mejl, a keyboard-first Fastmail client built on JMAP.">
+<link rel="icon" href="data:,">
+<style>
+/* Colour tokens. The terminal palette maps one to one onto the 16 ANSI colours,
+   so a real build can fall back to the user's own terminal theme. */
+:root {
+  color-scheme: dark;
+  --page-bg: #0f1115;
+  --page-fg: #d6dae1;
+  --page-muted: #8d94a0;
+  --page-line: #262a33;
+  --page-card: #151820;
+  --page-accent: #8cb2e2;
+  --page-kbd: #1d212a;
+
+  --t-bg: #15171c;      /* default background */
+  --t-fg: #c8cdd5;      /* default foreground, ANSI 7 */
+  --t-bold: #eef0f3;    /* bold text, ANSI 15 */
+  --t-dim: #666d79;     /* ANSI 8, bright black: borders, previews, hints */
+  --t-red: #d98080;     /* ANSI 1 */
+  --t-green: #93c393;   /* ANSI 2 */
+  --t-yellow: #d8bb7e;  /* ANSI 3 */
+  --t-blue: #86aee0;    /* ANSI 4 */
+  --t-magenta: #bb9fdc; /* ANSI 5 */
+  --t-cyan: #80c4c4;    /* ANSI 6 */
+  --t-cursor: #252932;  /* cursor row: ANSI 0 background (reverse video in the plain theme) */
+  --t-chrome: #1f232b;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --page-bg: #f6f5f1;
+  --page-fg: #23272e;
+  --page-muted: #646a74;
+  --page-line: #dddbd3;
+  --page-card: #ffffff;
+  --page-accent: #2c5f9e;
+  --page-kbd: #ecebe5;
+
+  --t-bg: #fbfaf7;
+  --t-fg: #30353d;
+  --t-bold: #101318;
+  --t-dim: #8b9099;
+  --t-red: #b04848;
+  --t-green: #3b7a3b;
+  --t-yellow: #8a6716;
+  --t-blue: #2c5f9e;
+  --t-magenta: #7a4ca6;
+  --t-cyan: #2a7a7a;
+  --t-cursor: #ebe9e2;  /* ANSI 7 background in a light theme */
+  --t-chrome: #e7e5de;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--page-bg);
+  color: var(--page-fg);
+  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow-x: hidden;
+}
+a { color: var(--page-accent); }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 16px; }
+header.page-head { padding: 40px 0 16px; }
+.eyebrow { margin: 0 0 4px; color: var(--page-muted); font-size: 14px; }
+h1 { margin: 0 0 12px; font-size: 32px; line-height: 1.2; letter-spacing: -0.01em; }
+h2 { margin: 0 0 12px; font-size: 22px; line-height: 1.3; }
+h3 { margin: 20px 0 6px; font-size: 16px; }
+p { margin: 0 0 12px; max-width: 78ch; }
+ul { margin: 0 0 12px; padding-left: 20px; max-width: 78ch; }
+li { margin: 2px 0; }
+kbd, code {
+  font-family: ui-monospace, "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+  font-size: 0.88em;
+}
+kbd {
+  background: var(--page-kbd); border: 1px solid var(--page-line); border-radius: 4px;
+  padding: 0 5px; white-space: nowrap;
+}
+code { background: var(--page-kbd); border-radius: 4px; padding: 0 4px; overflow-wrap: anywhere; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+button {
+  font: inherit; font-size: 14px; color: var(--page-fg); background: var(--page-card);
+  border: 1px solid var(--page-line); border-radius: 6px; padding: 6px 12px; cursor: pointer;
+}
+button:hover { border-color: var(--page-accent); }
+nav.tabs {
+  position: sticky; top: 0; z-index: 5;
+  background: color-mix(in srgb, var(--page-bg) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--page-line);
+}
+nav.tabs .wrap { display: flex; gap: 4px; overflow-x: auto; padding-top: 8px; padding-bottom: 8px; scrollbar-width: thin; }
+nav.tabs a {
+  flex: none; text-decoration: none; color: var(--page-muted); font-size: 14px;
+  padding: 4px 10px; border-radius: 6px; border: 1px solid transparent; white-space: nowrap;
+}
+nav.tabs a:hover { color: var(--page-fg); }
+nav.tabs a.on { color: var(--page-fg); border-color: var(--page-line); background: var(--page-card); }
+section { padding: 36px 0 8px; scroll-margin-top: 52px; }
+section + section { border-top: 1px solid var(--page-line); }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px 32px; }
+.cols > div > :first-child { margin-top: 0; }
+table.legend { border-collapse: collapse; font-size: 14px; margin: 0 0 12px; }
+table.legend td { padding: 3px 12px 3px 0; vertical-align: top; }
+table.legend td:first-child { font-family: ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace; white-space: nowrap; }
+.note { color: var(--page-muted); font-size: 14px; }
+.badge { display: inline-block; font-size: 13px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--page-line); }
+.badge.ok { color: var(--t-green); }
+.badge.bad { color: var(--t-red); }
+
+/* Terminal window. Page chrome may use web styling; the grid inside may not. */
+.scroller { max-width: 100%; overflow-x: auto; padding-bottom: 8px; margin: 4px 0 16px; }
+figure.window {
+  margin: 0; width: max-content;
+  border: 1px solid var(--page-line); border-radius: 8px; overflow: hidden;
+  background: var(--t-bg);
+}
+.chrome {
+  display: flex; align-items: center; gap: 12px; height: 28px; padding: 0 10px;
+  background: var(--t-chrome); color: var(--page-muted); font-size: 12px;
+  border-bottom: 1px solid var(--page-line);
+}
+.chrome .dots { display: flex; gap: 6px; }
+.chrome .dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--page-line); display: block; }
+.chrome .wtitle { flex: 1; text-align: center; }
+:root { --grid-fs: 12px; }
+.term {
+  --fs: var(--grid-fs);
+  font-family: ui-monospace, "JetBrains Mono", "Fira Code", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  font-size: var(--fs);
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+  line-height: 1.25;
+  color: var(--t-fg);
+  background: var(--t-bg);
+  padding: 6px 8px;
+  white-space: pre;
+  cursor: default;
+}
+.term .r { display: block; height: 1.25em; white-space: pre; }
+.term .w { display: inline-block; width: 1ch; text-align: center; overflow: visible; }
+
+/* Cell styles: only what a terminal can do (16 colours, bold, dim, underline, background). */
+.term .b { font-weight: 700; color: var(--t-bold); }
+.term .d { color: var(--t-dim); }
+.term .acc { color: var(--t-blue); }
+.term .k { color: var(--t-blue); font-weight: 700; }
+.term .brand { color: var(--t-bg); background: var(--t-blue); font-weight: 700; }
+.term .red { color: var(--t-red); }
+.term .grn { color: var(--t-green); }
+.term .yel { color: var(--t-yellow); }
+.term .mag { color: var(--t-magenta); }
+.term .cyn { color: var(--t-cyan); }
+.term .u { text-decoration: underline; text-underline-offset: 2px; }
+.term .cur { background: var(--t-cursor); }
+.term .bc { background: var(--t-fg); color: var(--t-bg); }
+</style>
+</head>
+<body>
+
+<header class="page-head">
+  <div class="wrap">
+    <p class="eyebrow">mejl research, docs/mockups.html, 2026-10-23</p>
+    <h1>mejl UI mock-ups</h1>
+    <p>These are design mock-ups for mejl, a planned terminal email client for Fastmail. They are not screenshots of working software. Every screen is drawn on a fixed grid of monospace cells, the way ratatui draws a terminal frame, so each layout could be built as shown.</p>
+    <p>The layouts follow the UX spec sketch in <a href="terminal-ux.md">terminal-ux.md</a>. The rules screen reflects what <a href="fastmail-rules-sieve.md">fastmail-rules-sieve.md</a> found possible today, and the Masked Email screens follow <a href="fastmail-masked-email.md">fastmail-masked-email.md</a>. All names, addresses and companies in the grids are fictional.</p>
+    <div class="controls">
+      <button id="theme" type="button" aria-pressed="false">Light theme</button>
+      <button id="smaller" type="button" aria-label="Smaller grid text">Grid text smaller</button>
+      <button id="bigger" type="button" aria-label="Larger grid text">Grid text larger</button>
+    </div>
+    <p class="note" style="margin-top:10px">Page keys: <kbd>1</kbd> to <kbd>9</kbd> jump to a screen, <kbd>t</kbd> toggles the theme.</p>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Screens">
+  <div class="wrap">
+    <a href="#about">About</a>
+    <a href="#inbox">1 Inbox</a>
+    <a href="#reader">2 Reader</a>
+    <a href="#compose">3 Compose</a>
+    <a href="#palette">4 Palette and search</a>
+    <a href="#rules">5 Rules</a>
+    <a href="#masked">6 Masked Email</a>
+    <a href="#narrow">7 Narrow</a>
+    <a href="#whichkey">8 Which-key</a>
+    <a href="#checks">Grid check</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<section id="about">
+  <h2>How to read the grids</h2>
+  <div class="cols">
+    <div>
+      <p>The grids use the default terminal theme idea from the spec: the 16 ANSI colours, bold for unread, dim for previews and hints, and one background for the cursor row. In a plain 16-colour theme the cursor row would be reverse video. The dark theme is the default. The light theme shows how the same ANSI roles read on a light terminal.</p>
+      <p>State never depends on colour alone. Every state has a glyph or a word. Indicator glyphs come from the Unicode "Neutral" width class, which terminal-ux.md checked, so they stay one cell wide in CJK locales. Box drawing is the one exception the spec accepts. A real build ships an ASCII fallback set.</p>
+      <p>Mouse support cannot be seen in a still grid, so each caption lists what is clickable. The rule from the spec holds everywhere: every mouse action has a key, no action needs the mouse, and every clickable label shows its key.</p>
+    </div>
+    <div>
+      <table class="legend">
+        <tr><td>◦</td><td>unread (row is also bold)</td></tr>
+        <tr><td>⚑</td><td>pinned (Fastmail's name for flagged)</td></tr>
+        <tr><td>@</td><td>delivered to a Masked Email address</td></tr>
+        <tr><td>✓</td><td>selected row, enabled item, or a passed check</td></tr>
+        <tr><td>✗</td><td>disabled item</td></tr>
+        <tr><td>▸ ▾</td><td>collapsed or expanded message, current item, menu</td></tr>
+        <tr><td>⋯</td><td>truncated text or a folded block</td></tr>
+        <tr><td>┃</td><td>scrollbar thumb on a pane border</td></tr>
+        <tr><td>blue bold</td><td>a key; in hint bars it is clickable</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="inbox">
+  <h2>1. Inbox, wide layout</h2>
+  <div class="scroller"><figure class="window" data-grid="inbox"></figure></div>
+  <div class="cols">
+    <div>
+      <h3>Design choices</h3>
+      <ul>
+        <li>Three panes at 160 columns or more: mailboxes, conversation list, reader preview. At 100 to 159 columns the sidebar becomes an overlay (screen 8). Under 100 columns it is a single stack (screen 7).</li>
+        <li>One row per conversation, with a message count after the sender. Rows: selection, unread, pin and mask markers, sender, subject, dim preview, date.</li>
+        <li>The date column is a fixed 6 cells so rows never jitter: a time for today, a weekday for this week, "Oct 3" for this year. Older mail would show the full date.</li>
+        <li>Saved searches are local to mejl, because Fastmail's saved searches have no public JMAP surface. Rules and Masked Email sit in the sidebar as tools.</li>
+        <li>The status line shows the selection counter and sync state. "Synced via JMAP push" means the EventSource stream is open and the last <code>StateChange</code> was caught up with <code>/changes</code>. The list always renders from the local cache.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Keys</h3>
+      <p><kbd>j</kbd>/<kbd>k</kbd> move, <kbd>o</kbd> or <kbd>Enter</kbd> open, <kbd>x</kbd> select, <kbd>X</kbd> range, <kbd>*</kbd> then <kbd>a</kbd>/<kbd>n</kbd> all or none, <kbd>y</kbd> archive, <kbd>d</kbd> trash, <kbd>s</kbd> pin, <kbd>m</kbd> move, <kbd>r</kbd>/<kbd>a</kbd>/<kbd>f</kbd> reply, reply all, forward, <kbd>z</kbd> undo, <kbd>Tab</kbd> next pane. These match Fastmail's web shortcuts.</p>
+      <h3>Mouse</h3>
+      <ul>
+        <li>Click a row to select and preview it. Double click opens it. Click the marker column to toggle selection.</li>
+        <li>The wheel scrolls the pane under the pointer. The thumb on the list border shows the position.</li>
+        <li>Drag either vertical border to resize panes. The ratio is saved.</li>
+        <li>Click a mailbox, a hint in the bottom bar, or right click a row for the actions menu (the same menu as <kbd>;</kbd>).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="reader">
+  <h2>2. Reader with Masked Email panel</h2>
+  <div class="scroller"><figure class="window" data-grid="reader"></figure></div>
+  <div class="cols">
+    <div>
+      <h3>Design choices</h3>
+      <ul>
+        <li>Read messages fold to one line. The newest message is expanded. Quoted text folds to a marker line, and <kbd>"</kbd> toggles it.</li>
+        <li>The HTML part is converted to styled text (html2text rich mode): the heading in bold, the table as aligned columns, and links as numbered footnotes listed at the end. OSC 8 links are an optional extra on top.</li>
+        <li>Remote images stay off. Fastmail only proxies images in its own apps, so loading them here would expose the user's IP address. <kbd>O</kbd> opens a sanitised copy in the browser.</li>
+        <li>The side panel shows which masked address received the message: its description, site, state, and a local message count. mejl matches To and Cc against the cached <code>MaskedEmail/get</code> list. The <code>X-FM-Masked-Email</code> header can help once its value is confirmed by a live test.</li>
+        <li>"Sender matches the site" is a phishing hint: mail from an unrelated domain to a shop's mask gets a warning instead.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>The disable flow</h3>
+      <p>One key, <kbd>@</kbd>, opens the disable confirm in the status line, as in this grid. The confirm is deliberate: disabling sends all future mail to Trash silently, password resets and receipts included. <kbd>y</kbd> disables, and an undo toast appears; <kbd>z</kbd> sets the mask back to enabled. The other mask actions are follow-ups in the same prompt: <kbd>d</kbd> deletes the mask (mail bounces) with a stronger confirm, <kbd>r</kbd> starts a rule, <kbd>m</kbd> lists all mail to the address.</p>
+      <p class="note">The Masked Email doc suggested a bare <kbd>x</kbd> here, and terminal-ux.md has <kbd>@</kbd> as a general mask actions key. mejl keeps <kbd>x</kbd> for select, as in Fastmail, and makes <kbd>@</kbd> a prompt that leads with disable. Copying the address moved to the global <kbd>Y</kbd> copy menu, because <kbd>y</kbd> answers the prompt.</p>
+      <h3>Keys and mouse</h3>
+      <p><kbd>j</kbd>/<kbd>k</kbd> next or previous conversation, <kbd>n</kbd>/<kbd>p</kbd> message, <kbd>e</kbd> expand, <kbd>L</kbd> links overlay, <kbd>H</kbd> full headers, <kbd>u</kbd> back. Click a footnote number or URL to open or copy it, click a fold marker to toggle it, click the attachment to save it, and click any side panel action.</p>
+    </div>
+  </div>
+</section>
+
+<section id="compose">
+  <h2>3. Compose with identity and mask picker</h2>
+  <div class="scroller"><figure class="window" data-grid="compose"></figure></div>
+  <div class="cols">
+    <div>
+      <h3>Design choices</h3>
+      <ul>
+        <li>The From picker lists identities and aliases, then offers a new masked address for the recipient's domain. It also shows whether a mask has been used with this recipient before.</li>
+        <li>The new mask is created with state <code>enabled</code>, not <code>pending</code>. Fastmail deletes pending masks after 24 hours if no mail arrives, which would break an address the user just handed out. mejl requires a description, and sets <code>forDomain</code> to the recipient's site.</li>
+        <li>The picker says plainly that sending as a mask over JMAP is untested. The web app can do it, but whether <code>Identity/get</code> lists masks or <code>EmailSubmission/set</code> accepts one is unknown. Until a live test passes, this is a design goal.</li>
+        <li>The body uses a built-in editor with markdown, sent as HTML plus a plain text part. The draft autosaves to Drafts through <code>Email/set</code>, and the status line shows its age.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Keys</h3>
+      <p><kbd>Tab</kbd>/<kbd>Shift-Tab</kbd> next or previous field. <kbd>Ctrl-o</kbd> is the compose prefix: <kbd>s</kbd> send, <kbd>a</kbd> attach, <kbd>m</kbd> new mask, <kbd>e</kbd> edit in <code>$EDITOR</code>, <kbd>p</kbd> preview, <kbd>d</kbd> discard. <kbd>Ctrl-s</kbd> saves. <kbd>Ctrl-Enter</kbd> sends on terminals with the kitty keyboard protocol, or tmux with extended keys, and is never the only way. <kbd>Esc</kbd> leaves the field, and a second <kbd>Esc</kbd> closes compose and keeps the draft. Alt keys are left out on purpose, because over SSH and tmux they can arrive as Esc plus a letter.</p>
+      <h3>Mouse</h3>
+      <p>Click a field to focus it, click a picker row to choose it, and click an attachment's remove hint. The body is a normal text field. Hold Shift to select text natively in kitty and Ghostty.</p>
+    </div>
+  </div>
+</section>
+
+<section id="palette">
+  <h2>4. Command palette and search</h2>
+  <div class="scroller"><figure class="window" data-grid="palette"></figure></div>
+  <div class="scroller"><figure class="window" data-grid="search"></figure></div>
+  <div class="cols">
+    <div>
+      <h3>Palette</h3>
+      <ul>
+        <li><kbd>:</kbd> or <kbd>Ctrl-k</kbd> opens it. One fuzzy list covers commands, mailboxes, saved searches, contacts, rules and masks. Matched letters are highlighted.</li>
+        <li>Every row shows its key binding, so using the palette teaches the shortcuts. Ranking mixes the fuzzy score with how often the user runs each command.</li>
+        <li>The screen behind it is drawn with the terminal's dim attribute, which ratatui supports. Nothing here needs transparency.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Search</h3>
+      <ul>
+        <li><kbd>/</kbd> takes Fastmail search syntax. mejl parses it into chips and shows the exact JMAP filter it sends, so the query is never a black box.</li>
+        <li>Local results arrive first from the cache. Server results from <code>Email/query</code> merge in after, each row labelled with its source.</li>
+        <li>Fastmail's <code>to:</code> covers To, Cc and Bcc, but JMAP's <code>to</code> filter matches only the To header. mejl ORs the three filters to keep Fastmail's meaning.</li>
+        <li><kbd>Enter</kbd> turns the results into a normal list view, and <kbd>Ctrl-s</kbd> saves the search locally. Click a row to open it, or a chip to edit it.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="rules">
+  <h2>5. Rules manager (Sieve)</h2>
+  <div class="scroller"><figure class="window" data-grid="rules"></figure></div>
+  <div class="cols">
+    <div>
+      <h3>What is possible today, and how the screen shows it</h3>
+      <ul>
+        <li>Fastmail has no public API for rules or Sieve. Its Sieve FAQ says the only way to change the script is the web interface, and it offers no ManageSieve. No API token or documented OAuth scope covers rules. A private web-client API exists, but Fastmail's API Developer Policy forbids "using unpublished APIs", so mejl does not touch it.</li>
+        <li>So mejl owns its rules and renders one marked Sieve block. <kbd>P</kbd> copies the block to the clipboard (OSC 52) and opens Settings, Filters &amp; Rules. The user pastes it into the custom section directly below spam protection, replacing the old block. The banner and the "paste status" box make this manual step visible at all times.</li>
+        <li>mejl cannot read the server script, so "on Fastmail" says unknown. <kbd>v</kbd> lets the user paste the section back, and mejl checks the markers and the hash for drift.</li>
+        <li>Fastmail's own UI rules are not listed. The JSON export and import route is untested, so this screen does not pretend to read it.</li>
+        <li>The "where the block runs" order, and the target section below spam protection, come from third-party samples of the generated script, not from Fastmail's docs. Fastmail's help page describes four editable areas while the samples show three, so the box says the order is unconfirmed and mejl names the target by position, never by number.</li>
+        <li>If a Fastmail session ever advertises <code>urn:ietf:params:jmap:sieve</code> (RFC 9661), <kbd>P</kbd> becomes a direct upload and the banner goes away. mejl would still only edit its own marked region.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>How the block is written</h3>
+      <ul>
+        <li>Begin and end markers with a hash. No <code>require</code> line, since Fastmail generates it, and only extensions that appear in Fastmail's require line.</li>
+        <li><code>fileinto :mailboxid</code> with the folder name as fallback (RFC 9042), so a rename does not break the rule.</li>
+        <li>A disabled rule renders as <code>if false #</code>, the Roundcube pattern, so mejl can parse its own block back.</li>
+        <li>Never <code>keep</code> (a forum report says it breaks alias folder delivery) and never <code>discard</code> (it bypasses Fastmail's backups). <code>stop</code> is off by default, with a warning that it would also skip Fastmail's own rules, notifications, calendar handling and vacation replies.</li>
+        <li>The dry run checks mejl's block with a local Sieve parser against cached mail. It cannot simulate Fastmail's generated blocks. "Apply to existing" uses the documented <code>Email/set</code> and can be undone.</li>
+      </ul>
+      <h3>Keys and mouse</h3>
+      <p><kbd>n</kbd> new, <kbd>F</kbd> new from a message (in the reader), <kbd>Enter</kbd> edit, <kbd>Space</kbd> on or off, <kbd>J</kbd>/<kbd>K</kbd> reorder, <kbd>t</kbd> dry run, <kbd>a</kbd> apply to existing. Click a rule to edit it, click a condition to change it, drag the borders to resize, and click any hint.</p>
+    </div>
+  </div>
+</section>
+
+<section id="masked">
+  <h2>6. Masked Email manager</h2>
+  <div class="scroller"><figure class="window" data-grid="masked"></figure></div>
+  <div class="cols">
+    <div>
+      <h3>Design choices</h3>
+      <ul>
+        <li>One <code>MaskedEmail/get</code> with <code>ids: null</code> loads every mask into the cache. mejl refreshes on demand, after its own writes and on a timer, then diffs locally. Reports say <code>/changes</code> does not work for masks, and push coverage is unknown, so the status line says when the last full refresh ran.</li>
+        <li>States use a glyph and a word: ✓ enabled, ✗ disabled (mail goes to Trash), ◦ pending (hidden in Fastmail's UI and deleted after 24 hours), and - deleted (mail bounces, restorable). Like Fastmail, the default filter hides pending and deleted. Here the user has turned them on with <kbd>3</kbd> and <kbd>4</kbd>.</li>
+        <li>The message count and sender list come from mejl's own index, because the API has no message link. <kbd>!</kbd> marks a mask that got mail from a sender unrelated to its site.</li>
+        <li><code>createdBy</code> is set by the server, so masks made by mejl show its token or OAuth client name.</li>
+        <li>Fastmail publishes no creation limits. On a <code>rateLimit</code> error mejl says Fastmail limits how many masks can be created and offers an existing mask for the same site. It never shows a "remaining" count.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Keys</h3>
+      <p><kbd>/</kbd> search address, description and site, <kbd>1</kbd> to <kbd>4</kbd> toggle state filters, <kbd>n</kbd> new (description required, created enabled), <kbd>e</kbd> enable, <kbd>x</kbd> disable with confirm and undo, <kbd>D</kbd> delete with a stronger confirm, <kbd>r</kbd> rename, <kbd>Enter</kbd> show messages, <kbd>y</kbd> copy, <kbd>R</kbd> make a rule for this address. A used mask cannot be destroyed, so delete always means state <code>deleted</code>.</p>
+      <h3>Mouse</h3>
+      <p>Click a column header to sort, click a filter chip to toggle it, click a row to show its details, and double click to list its messages.</p>
+    </div>
+  </div>
+</section>
+
+<section id="narrow">
+  <h2>7. Narrow layout, 80 by 24</h2>
+  <div class="scroller"><figure class="window" data-grid="narrow"></figure></div>
+  <div class="cols">
+    <div>
+      <h3>How the inbox collapses</h3>
+      <ul>
+        <li>Under 100 columns mejl uses one pane. The sidebar hides behind <kbd>g</kbd> or a click on "Inbox ▾". <kbd>Enter</kbd> opens the reader full width, and <kbd>u</kbd> or <kbd>Esc</kbd> comes back.</li>
+        <li>The preview text goes first, then the selection column, which only appears while a selection is active. The date column keeps its fixed width.</li>
+        <li>The hint bar keeps the most used keys and <kbd>?</kbd> shows the rest. Below 20 rows the hint bar can be turned off.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Why it matters</h3>
+      <p>Many users run a mail client in a tmux split or over SSH on a small window. The same keys work at every width, so muscle memory carries over from the wide layout.</p>
+    </div>
+  </div>
+</section>
+
+<section id="whichkey">
+  <h2>8. Which-key popup after a prefix</h2>
+  <div class="scroller"><figure class="window" data-grid="whichkey"></figure></div>
+  <div class="cols">
+    <div>
+      <h3>Design choices</h3>
+      <ul>
+        <li>The user pressed <kbd>g</kbd>. A prefix key does nothing on its own, so mejl never waits on a timeout. The popup lists the follow-up keys at once, and the status line shows the pending prefix.</li>
+        <li><kbd>Esc</kbd> cancels. A key that is not listed cancels too, and does nothing else.</li>
+        <li>The same popup appears for every prefix: <kbd>.</kbd> mark, <kbd>*</kbd> select, and <kbd>Ctrl-o</kbd> in compose. <kbd>@</kbd> in the reader is a prompt instead, because it leads with the disable confirm (screen 2).</li>
+        <li>This grid also shows the middle breakpoint: at 120 columns the list and the reader share the screen and the sidebar is an overlay.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Mouse</h3>
+      <p>Click an entry to run it. Click outside the popup to cancel.</p>
+    </div>
+  </div>
+</section>
+
+<section id="checks">
+  <h2>Grid check</h2>
+  <p>When the page loads, a script checks every grid. Each row must hold exactly the declared number of cells, no text may be clipped at a pane edge, and only ASCII, box drawing and the safe glyph set may appear. It also measures each rendered row against the cell width, which catches glyphs that fall back to a wider font. Results go to the browser console and appear below.</p>
+  <p id="check-result" class="note">Running checks...</p>
+  <h3>What these mock-ups cannot show</h3>
+  <ul>
+    <li>Speed. The goal is that mejl's own work fits in one frame (p99 under 8 ms) for local actions, with no waiting on the network. A still picture cannot show that.</li>
+    <li>Hover, drag and click behaviour. The captions describe them instead.</li>
+    <li>Your terminal's font and palette. A real build uses them, so colours and glyph shapes will differ.</li>
+  </ul>
+</section>
+
+</main>
+
+<noscript><p class="wrap">The grids are drawn by a small inline script. Enable JavaScript to see them.</p></noscript>
+
+<script>
+'use strict';
+
+/* ---------- Cell grid, modelled on a ratatui buffer ---------- */
+
+const U = 1, R = 2, D = 4, L = 8;
+const BOX = {};
+BOX[R | L] = '─'; BOX[R] = '─'; BOX[L] = '─';
+BOX[U | D] = '│'; BOX[U] = '│'; BOX[D] = '│';
+BOX[R | D] = '┌'; BOX[D | L] = '┐'; BOX[U | R] = '└'; BOX[U | L] = '┘';
+BOX[U | R | D] = '├'; BOX[U | D | L] = '┤'; BOX[R | D | L] = '┬'; BOX[U | R | L] = '┴';
+BOX[U | R | D | L] = '┼';
+
+const len = (s) => [...String(s)].length;
+
+function fit(s, n) {
+  const a = [...String(s)];
+  if (n <= 0) return '';
+  if (a.length > n) return a.slice(0, n - 1).join('') + '⋯';
+  return a.join('') + ' '.repeat(n - a.length);
+}
+function rfit(s, n) {
+  const a = [...String(s)];
+  if (a.length > n) return a.slice(0, n - 1).join('') + '⋯';
+  return ' '.repeat(n - a.length) + a.join('');
+}
+function wrap(text, w) {
+  const out = [];
+  for (const para of text.split('\n')) {
+    if (para === '') { out.push(''); continue; }
+    let line = '';
+    for (const word of para.split(' ')) {
+      if (line === '') line = word;
+      else if (len(line) + 1 + len(word) <= w) line += ' ' + word;
+      else { out.push(line); line = word; }
+    }
+    out.push(line);
+  }
+  return out;
+}
+
+class Grid {
+  constructor(id, w, h) {
+    this.id = id; this.w = w; this.h = h; this.issues = [];
+    this.ch = []; this.fg = []; this.bg = []; this.mk = [];
+    for (let y = 0; y < h; y++) {
+      this.ch.push(Array(w).fill(' '));
+      this.fg.push(Array(w).fill(''));
+      this.bg.push(Array(w).fill(''));
+      this.mk.push(Array(w).fill(0));
+    }
+  }
+  inb(x, y) { return x >= 0 && y >= 0 && x < this.w && y < this.h; }
+  /* Write text. Anything past `lim` (a pane edge) is clipped and reported. */
+  put(x, y, s, cls = '', lim = this.w) {
+    const cs = [...String(s)];
+    if (y < 0 || y >= this.h) { this.issues.push(`row ${y} is outside the grid: "${s}"`); return x; }
+    for (let i = 0; i < cs.length; i++) {
+      const xx = x + i;
+      if (xx >= lim || xx >= this.w) { this.issues.push(`text clipped at row ${y}, col ${xx}: "${s}"`); return xx; }
+      if (xx < 0) continue;
+      this.ch[y][xx] = cs[i]; this.fg[y][xx] = cls; this.mk[y][xx] = 0;
+    }
+    return x + cs.length;
+  }
+  seq(x, y, parts, lim = this.w) {
+    for (const p of parts) x = this.put(x, y, p[0], p[1] || '', lim);
+    return x;
+  }
+  right(y, parts, edge = this.w - 1) {
+    const t = parts.map((p) => p[0]).join('');
+    return this.seq(edge - len(t), y, parts, edge);
+  }
+  line(x, y, bits, cls) {
+    if (!this.inb(x, y)) { this.issues.push(`line outside the grid at ${x},${y}`); return; }
+    this.ch[y][x] = null; this.mk[y][x] |= bits; this.fg[y][x] = cls;
+  }
+  hline(x1, x2, y, cls = 'd') {
+    for (let x = x1; x <= x2; x++) this.line(x, y, ((x > x1 ? L : 0) | (x < x2 ? R : 0)) || (L | R), cls);
+  }
+  vline(x, y1, y2, cls = 'd') {
+    for (let y = y1; y <= y2; y++) this.line(x, y, ((y > y1 ? U : 0) | (y < y2 ? D : 0)) || (U | D), cls);
+  }
+  box(x, y, w, h, cls = 'd') {
+    this.hline(x, x + w - 1, y, cls); this.hline(x, x + w - 1, y + h - 1, cls);
+    this.vline(x, y, y + h - 1, cls); this.vline(x + w - 1, y, y + h - 1, cls);
+  }
+  clear(x, y, w, h) {
+    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) {
+      if (!this.inb(xx, yy)) continue;
+      this.ch[yy][xx] = ' '; this.fg[yy][xx] = ''; this.bg[yy][xx] = ''; this.mk[yy][xx] = 0;
+    }
+  }
+  shade(x, y, w, cls) { for (let i = 0; i < w; i++) if (this.inb(x + i, y)) this.bg[y][x + i] = cls; }
+  /* The terminal DIM attribute over everything already drawn, as behind a modal. */
+  dimAll() {
+    for (let y = 0; y < this.h; y++) for (let x = 0; x < this.w; x++) { this.fg[y][x] = 'd'; this.bg[y][x] = ''; }
+  }
+  title(x, y, s, cls = 'd') { return this.put(x, y, ' ' + s + ' ', cls); }
+  cell(x, y) { const c = this.ch[y][x]; return c === null ? (BOX[this.mk[y][x]] || '?') : c; }
+  lines() {
+    const out = [];
+    for (let y = 0; y < this.h; y++) { let s = ''; for (let x = 0; x < this.w; x++) s += this.cell(x, y); out.push(s); }
+    return out;
+  }
+}
+
+/* ---------- Shared pieces ---------- */
+
+function topBar(g, crumbs, right) {
+  let x = g.put(0, 0, ' mejl ', 'brand');
+  x = g.put(x, 0, '  ');
+  const end = g.seq(x, 0, crumbs);
+  if (right) {
+    const start = g.w - 1 - len(right.map((p) => p[0]).join(''));
+    if (start <= end) g.issues.push('top bar: left and right text overlap');
+    g.right(0, right);
+  }
+}
+function statusLine(g, y, left, right) {
+  const end = g.seq(1, y, left);
+  if (right) {
+    const start = g.w - 1 - len(right.map((p) => p[0]).join(''));
+    if (start <= end) g.issues.push(`status line ${y}: left and right text overlap`);
+    g.right(y, right);
+  }
+}
+function hintBar(g, y, items) {
+  let x = 1;
+  items.forEach(([key, label], i) => {
+    if (i > 0) x += 2;
+    x = g.put(x, y, key, 'k');
+    x = g.put(x, y, ' ' + label, 'd');
+  });
+}
+function scrollbar(g, x, y1, y2, from, to) {
+  for (let y = y1 + from; y <= Math.min(y2, y1 + to); y++) g.put(x, y, '┃', '');
+}
+
+/* ---------- Fictional data ---------- */
+
+const CONVS = [
+  { g: 'Today' },
+  { from: 'Juniper Tran', n: 3, subj: 'Re: Garden club plot rota', prev: 'Swapping Saturday works for me, can you take the 14th', date: '14:02', unread: 1, cur: 1 },
+  { from: 'Owen Castillo', subj: 'Draft budget for the hall repairs', prev: 'Attached the spreadsheet. The roof line is the big one', date: '13:47', unread: 1, pin: 1 },
+  { from: 'Larkspur Support', n: 3, subj: 'Re: Your order 48213 has shipped', prev: 'Good news: we changed the delivery address and', date: '09:12', unread: 1, mask: 1 },
+  { from: 'Lena Okafor', n: 2, subj: 'Re: Thursday standup notes', prev: 'Agreed on moving the release to the 30th', date: '08:55' },
+  { from: 'Northgate Library', subj: 'Your reservation is ready to collect', prev: 'The book you reserved is waiting at the front desk', date: '07:30', mask: 1 },
+  { g: 'Yesterday' },
+  { from: 'Priya Raman', n: 5, subj: 'Re: Trip to the coast in November', prev: 'Booked the cabin, link below. Can everyone confirm', date: 'Thu', sel: 1 },
+  { from: 'Tessellate Weekly', subj: 'Issue 112: tiling window managers', prev: 'This week: layouts, gaps and a short history', date: 'Thu', mask: 1 },
+  { from: 'Marco Bellini', subj: 'Invoice 2026-118', prev: 'Please find the invoice for October attached', date: 'Thu', pin: 1, sel: 1 },
+  { g: 'This week' },
+  { from: 'City Notices', subj: 'Road closure on Elm Street, Oct 28', prev: 'Works start at 07:00 and run until late afternoon', date: 'Wed' },
+  { from: 'Dana Whitfield', n: 2, subj: 'Re: Recipe for the plum cake', prev: 'Use less sugar than it says, the plums are sweet', date: 'Wed' },
+  { from: 'Kestrel Bank', subj: 'Your October statement is ready', prev: 'Sign in to view your statement. We will never ask', date: 'Tue', mask: 1 },
+  { from: 'Sam Ito', subj: 'Photos from the climbing trip', prev: 'Here are the good ones, the rest are mostly blurry', date: 'Tue' },
+  { from: 'Ravi Menon', n: 4, subj: 'Re: Board game night', prev: 'I can bring the new expansion if people want', date: 'Mon' },
+  { from: 'Example Hosting', subj: 'Renewal notice for example.org', prev: 'Your domain renews automatically on 12 November', date: 'Mon' },
+  { g: 'Earlier' },
+  { from: 'Grace Lindqvist', subj: 'Quarterly newsletter draft', prev: 'Comments welcome before Friday, especially on', date: 'Oct 17' },
+  { from: 'Harbor Dental', subj: 'Appointment reminder: 3 November', prev: 'Reply C to confirm or call us to rearrange', date: 'Oct 16', mask: 1 },
+  { from: 'Felix Moreau', n: 6, subj: 'Re: Moving the book club', prev: 'Second Tuesday works better for most of us', date: 'Oct 15' },
+  { from: 'Wren Analytics', subj: 'Weekly report: 3 new signups', prev: 'Traffic is up 4 percent on last week', date: 'Oct 14', mask: 1 },
+  { from: 'Juniper Tran', subj: 'Seed order list', prev: 'Final list attached. Shout if I missed anything', date: 'Oct 12' },
+  { from: 'Noor Haddad', n: 2, subj: 'Re: Spare room this weekend?', prev: 'Yes, the spare room is free, come Friday', date: 'Oct 10' },
+  { from: 'Larkspur Outfitters', subj: 'Receipt for order 47720', prev: 'Thanks for shopping with us. Your receipt is', date: 'Oct 8', mask: 1 },
+  { from: 'Theo Park', subj: 'Slides from the meetup', prev: 'Slides and the recording link are below', date: 'Oct 6' },
+  { from: 'Maple Street Co-op', subj: 'Membership renewal', prev: 'Your membership is due for renewal this month', date: 'Oct 3', mask: 1 },
+  { from: 'Ines Duarte', n: 3, subj: 'Re: Translation review', prev: 'Two small fixes in section 4, otherwise good', date: 'Oct 1' },
+  { from: 'Owen Castillo', subj: 'Hall booking calendar', prev: 'Shared the calendar for the winter term', date: 'Sep 29' },
+  { from: 'Bea Kowalski', n: 2, subj: 'Re: Running club route', prev: 'The river loop is flooded, take the hill route', date: 'Sep 27' },
+  { from: 'Calder Insurance', subj: 'Policy documents', prev: 'Your renewed policy documents are attached', date: 'Sep 25', mask: 1 },
+  { from: 'Lena Okafor', subj: 'Offsite agenda', prev: 'Draft agenda for the offsite, comments welcome', date: 'Sep 22' },
+  { from: 'Pia Sorensen', subj: 'Choir rehearsal moved', prev: 'We are in the small hall this week', date: 'Sep 20' },
+  { from: 'Hugo Brandt', subj: 'Old flat deposit', prev: 'The deposit came back in full, finally', date: 'Sep 18' },
+];
+
+const SIDEBAR = [
+  ['Inbox', '12', 'active'], ['Drafts', '1'], ['Sent', ''], ['Archive', ''], ['Spam', '3'], ['Trash', ''],
+  null,
+  ['#Folders'], ['Newsletters', '5'], ['Receipts', ''], ['Projects', ''], ['  Garden club', '2'], ['  Hall repairs', ''], ['Travel', ''],
+  null,
+  ['#Saved searches'], ['VIPs, unread', '1'], ['Masked, 7 days', '4'], ['Has attachment', ''],
+  null,
+  ['#Tools'], ['Rules', 'g r', 'key'], ['Masked Email', 'g m', 'key'], ['Settings', 'g ,', 'key'],
+];
+
+/* ---------- Building blocks for mail screens ---------- */
+
+function sidebar(g, x, y, w) {
+  const lim = x + w;
+  SIDEBAR.forEach((it, i) => {
+    const yy = y + i;
+    if (!it) return;
+    if (it[0][0] === '#') { g.put(x + 1, yy, fit(it[0].slice(1), w - 1), 'd', lim); return; }
+    const [name, count, kind] = it;
+    const cw = 4;
+    if (kind === 'active') {
+      g.put(x, yy, '▸', 'acc', lim);
+      g.put(x + 1, yy, fit(name, w - cw - 2), 'b acc', lim);
+      g.put(x + w - cw - 1, yy, rfit(count, cw), 'b acc', lim);
+      g.shade(x, yy, w, 'cur');
+    } else {
+      g.put(x + 1, yy, fit(name, w - cw - 2), '', lim);
+      g.put(x + w - cw - 1, yy, rfit(count, cw), kind === 'key' ? 'k' : 'b', lim);
+    }
+  });
+}
+
+function listItem(g, x, y, w, c, o) {
+  const lim = x + w;
+  if (c.g) { g.put(x + 1, y, c.g, 'd', lim); return; }
+  let cx = x + 1;
+  if (o.sel) cx = g.put(cx, y, c.sel ? '✓' : ' ', 'yel b', lim);
+  cx = g.put(cx, y, c.unread ? '◦' : ' ', 'acc b', lim);
+  cx = g.put(cx, y, c.pin ? '⚑' : ' ', 'red', lim);
+  cx = g.put(cx, y, c.mask ? '@' : ' ', 'mag', lim);
+  cx += 1;
+  const sender = c.from + (c.n > 1 ? ` (${c.n})` : '');
+  g.put(cx, y, fit(sender, o.sw), c.unread ? 'b' : '', lim);
+  cx += o.sw + 1;
+  const dateW = 6;
+  const subjW = lim - cx - dateW - 2;
+  if (o.preview && len(c.subj) + 2 + 12 <= subjW) {
+    const e = g.put(cx, y, c.subj, c.unread ? 'b' : '', lim);
+    g.put(e + 2, y, fit(c.prev, subjW - len(c.subj) - 2), 'd', lim);
+  } else {
+    g.put(cx, y, fit(c.subj, subjW), c.unread ? 'b' : '', lim);
+  }
+  g.put(lim - dateW - 1, y, rfit(c.date, dateW), c.unread ? 'b' : 'd', lim);
+  if (c.cur && !o.noCursor) g.shade(x, y, w, 'cur');
+}
+
+function readerJuniper(g, x, y, w) {
+  const lim = x + w;
+  let yy = y;
+  const P = (parts) => { g.seq(x, yy, parts, lim); yy++; };
+  P([[' 3 messages in Garden club', 'd']]);
+  yy++;
+  const collapsed = (name, date, prev) => {
+    const head = ' ▸ ' + fit(name, 16) + ' ' + fit(date, 9) + ' ';
+    P([[head, ''], [fit(prev, w - len(head) - 1), 'd']]);
+  };
+  collapsed('Juniper Tran', 'Mon 10:14', 'Here is the rota for November, plots 1 to 12 are listed');
+  collapsed('Mira Holt (you)', 'Mon 18:40', 'Thanks! I cannot do the 7th, could someone swap with me');
+  g.seq(x, yy, [[' ▾ ', 'acc'], ['Juniper Tran', 'b'], [' <juniper@garden.example.com>', 'd']], lim);
+  g.right(yy, [['14:02', 'b']], lim - 1); yy++;
+  P([['   to me, garden-club@example.org', 'd']]);
+  yy++;
+  const body = 'Swapping Saturday works for me, can you take the 14th instead? Then Owen covers the 21st and we are set.\n\n' +
+    'The compost delivery is on the 9th, so whoever is on that week please be there by 8. I will leave the shed key with Noor.\n\n' +
+    'I have updated the shared rota[1].';
+  for (const l of wrap(body, w - 5)) {
+    if (l.endsWith('[1].')) P([['   ' + l.replace('[1].', ''), ''], ['[1]', 'cyn'], ['.', '']]);
+    else P([['   ' + l, '']]);
+  }
+  yy++;
+  P([['   ⋯ 12 quoted lines  (', 'd'], ['"', 'k'], [')', 'd']]);
+  yy++;
+  P([['   Juniper', '']]);
+  P([['   ⋯ signature, 3 lines', 'd']]);
+  yy++;
+  P([['   [1] ', 'cyn'], ['https://garden.example.com/rota', 'cyn u']]);
+  yy++;
+  P([['   ', ''], ['r', 'k'], [' reply  ', 'd'], ['a', 'k'], [' reply all  ', 'd'], ['f', 'k'], [' forward  ', 'd'], ['E', 'k'], [' expand all', 'd']]);
+}
+
+function baseMail120(id) {
+  const g = new Grid(id, 120, 36);
+  topBar(g, [['mira@example.org', 'd'], ['   '], ['Inbox ▾', 'b'], ['  12 unread', 'd']], [['fastmail preset', 'd'], ['   '], ['? help', 'd']]);
+  g.box(0, 1, 120, 33);
+  const Lx = 58;
+  g.vline(Lx, 1, 33);
+  g.title(2, 1, 'Inbox  12 unread', 'b acc');
+  g.title(Lx + 2, 1, 'Re: Garden club plot rota', 'd');
+  CONVS.slice(0, 31).forEach((c, i) => listItem(g, 1, 2 + i, Lx - 1, c, { sel: false, preview: false, sw: 16 }));
+  scrollbar(g, Lx, 2, 32, 0, 9);
+  readerJuniper(g, Lx + 1, 2, 120 - Lx - 2);
+  return g;
+}
+
+/* ---------- Screen 1: inbox, 160 x 40, three panes ---------- */
+
+function buildInbox() {
+  const g = new Grid('inbox', 160, 40);
+  topBar(g, [['mira@example.org', 'd'], ['   '], ['Inbox', 'b'], ['  12 unread, 214 conversations', 'd']], [['fastmail preset', 'd'], ['   '], ['? help', 'd']]);
+  g.box(0, 1, 160, 37);
+  const S = 23, Lx = 97;
+  g.vline(S, 1, 37); g.vline(Lx, 1, 37);
+  g.title(2, 1, 'Mailboxes', 'd');
+  g.title(S + 2, 1, 'Inbox', 'b acc');
+  g.title(Lx + 2, 1, 'Re: Garden club plot rota', 'd');
+  sidebar(g, 1, 2, S - 1);
+  CONVS.forEach((c, i) => listItem(g, S + 1, 2 + i, Lx - S - 1, c, { sel: true, preview: true, sw: 20 }));
+  scrollbar(g, Lx, 2, 36, 0, 10);
+  readerJuniper(g, Lx + 1, 2, 160 - Lx - 2);
+  statusLine(g, 38, [['selection: 2', 'yel b'], ['    ', ''], ['y', 'k'], [' archive  ', 'd'], ['d', 'k'], [' trash  ', 'd'], ['* n', 'k'], [' clear', 'd']],
+    [['✓', 'grn'], [' synced via JMAP push', 'd'], ['  14:02:31', 'd']]);
+  hintBar(g, 39, [['j/k', 'move'], ['o', 'open'], ['x', 'select'], ['y', 'archive'], ['d', 'trash'], ['s', 'pin'], ['m', 'move to'],
+    ['r', 'reply'], ['c', 'compose'], ['/', 'search'], [':', 'commands'], ['g', 'go'], ['z', 'undo'], ['?', 'help']]);
+  return g;
+}
+
+/* ---------- Screen 2: reader, 120 x 36 ---------- */
+
+function buildReader() {
+  const g = new Grid('reader', 120, 36);
+  topBar(g, [['mira@example.org', 'd'], ['   '], ['Inbox', 'd'], [' > ', 'd'], ['Re: Your order 48213 has shipped', 'b']], [['3 of 214', 'd']]);
+  g.box(0, 1, 120, 33);
+  const V = 83;
+  g.vline(V, 1, 33);
+  g.title(2, 1, 'Re: Your order 48213 has shipped', 'b acc');
+  g.title(V + 2, 1, 'Delivered to a masked address', 'mag');
+  const lim = V;
+  let y = 2;
+  const P = (parts) => { g.seq(1, y, parts, lim); y++; };
+  P([[' 3 messages, 1 attachment', 'd'], ['   label: Receipts', 'd']]);
+  const collapsed = (name, date, prev) => {
+    const head = ' ▸ ' + fit(name, 20) + ' ' + fit(date, 13) + ' ';
+    P([[head, ''], [fit(prev, V - 1 - len(head) - 1), 'd']]);
+  };
+  collapsed('Larkspur Outfitters', 'Oct 20 16:05', 'Thanks for your order. Order 48213 is confirmed and will ship soon');
+  collapsed('Mira Holt (you)', 'Oct 21 08:31', 'Hi, could you ship to my work address instead? It is 4 Quay Road');
+  g.seq(1, y, [[' ▾ ', 'acc'], ['Larkspur Support', 'b'], [' <help@shop.example.com>', 'd']], lim);
+  g.right(y, [['Fri 23 Oct 09:12', 'b']], V - 1); y++;
+  P([['   to ', 'd'], ['kettle.fern4821@example.org', 'mag'], ['  ', ''], ['@', 'mag b'], [' masked: Larkspur shop', 'mag']]);
+  g.seq(1, y, [['   remote images off, 2 trackers blocked', 'yel']], lim);
+  g.right(y, [['O', 'k'], [' open in browser', 'd']], V - 1); y++;
+  y++;
+  const I = '      ';
+  P([[I + 'ORDER UPDATE', 'b']]);
+  y++;
+  P([[I + 'Hi Mira,', '']]);
+  y++;
+  for (const l of wrap('Good news: we changed the delivery address and your order has shipped. You can follow the parcel with the link below.', 70)) P([[I + l, '']]);
+  y++;
+  P([[I, ''], ['[ Track your parcel ]', 'cyn u'], ['[1]', 'cyn']]);
+  y++;
+  P([[I + fit('Item', 34) + '  ' + rfit('Qty', 3) + '  ' + rfit('Price', 8), 'b']]);
+  P([[I + '─'.repeat(34) + '  ' + '─'.repeat(3) + '  ' + '─'.repeat(8), 'd']]);
+  const row = (a, b, c, cls = '') => P([[I + fit(a, 34) + '  ' + rfit(b, 3) + '  ' + rfit(c, 8), cls]]);
+  row('Merino hiking socks, 2-pack', '1', '18.00');
+  row('Trail bottle, 750 ml', '2', '24.00');
+  row('Delivery', '', '0.00');
+  row('Total', '', '42.00', 'b');
+  y++;
+  P([[I + 'Questions? Reply to this email or visit our help centre', ''], ['[2]', 'cyn'], ['.', '']]);
+  P([[I + 'Manage your email preferences', ''], ['[3]', 'cyn'], ['.', '']]);
+  y++;
+  P([[I + '⋯ 18 quoted lines from Mira Holt, Oct 21  (', 'd'], ['"', 'k'], [' to show)', 'd']]);
+  y++;
+  P([[I + '[1] ', 'cyn'], ['https://shop.example.com/track/48213', 'cyn u']]);
+  P([[I + '[2] ', 'cyn'], ['https://shop.example.com/help', 'cyn u']]);
+  P([[I + '[3] ', 'cyn'], ['https://shop.example.com/preferences', 'cyn u']]);
+  if (y > 33) g.issues.push('reader body runs past the pane');
+
+  /* side panel */
+  const sx = V + 1, sl = 119;
+  let s = 2;
+  const S = (parts) => { g.seq(sx, s, parts, sl); s++; };
+  S([[' @ ', 'mag b'], ['kettle.fern4821@example.org', 'mag b']]);
+  S([['   Larkspur shop', 'b']]);
+  S([['   site     ', 'd'], ['shop.example.com', '']]);
+  S([['   state    ', 'd'], ['✓ enabled', 'grn']]);
+  S([['   created  ', 'd'], ['2025-03-14 by mejl', '']]);
+  S([['   last     ', 'd'], ['today 09:12', '']]);
+  S([['   mail     ', 'd'], ['23 messages, 0 in Spam', '']]);
+  S([['   ✓ ', 'grn'], ['sender matches the site', 'd']]);
+  s++;
+  const act = (k, t) => S([['   ', ''], [fit(k, 3), 'k'], ['  ' + t, '']]);
+  act('@', 'disable: mail to Trash');
+  S([['   then, in the same prompt:', 'd']]);
+  act('d', 'delete: mail bounces');
+  act('r', 'rule for this address');
+  act('m', 'all mail to this address');
+  g.hline(V, 119, 16); g.title(V + 2, 16, 'Attachments', 'd');
+  s = 17;
+  S([['   ', ''], ['invoice-48213.pdf', 'cyn u'], ['      84 KB', 'd']]);
+  S([['   ', ''], ['Enter', 'k'], [' save  ', 'd'], ['O', 'k'], [' open  ', 'd'], ['Y', 'k'], [' copy', 'd']]);
+  g.hline(V, 119, 19); g.title(V + 2, 19, 'Sender', 'd');
+  s = 20;
+  S([['   help@shop.example.com', '']]);
+  S([['   not in contacts', 'd']]);
+  S([['   ', ''], ['F', 'k'], ['  new rule from this message', '']]);
+  S([['   ', ''], ['M', 'k'], ['  mute conversation', '']]);
+
+  statusLine(g, 34, [['Disable kettle.fern4821@example.org? Mail goes to Trash.', 'yel b'], ['  ', ''], ['y', 'k'], ['/', 'd'], ['N', 'k'],
+    ['   ', ''], ['d', 'k'], [' delete  ', 'd'], ['r', 'k'], [' rule  ', 'd'], ['m', 'k'], [' mail', 'd']],
+    [['@', 'd']]);
+  hintBar(g, 35, [['j/k', 'conversation'], ['n/p', 'message'], ['"', 'quotes'], ['L', 'links'], ['@', 'disable mask'], ['y', 'archive'],
+    ['d', 'trash'], ['r', 'reply'], ['u', 'back'], ['?', 'help']]);
+  return g;
+}
+
+/* ---------- Screen 3: compose, 120 x 36 ---------- */
+
+function buildCompose() {
+  const g = new Grid('compose', 120, 36);
+  topBar(g, [['mira@example.org', 'd'], ['   '], ['New message', 'b']], [['draft in Drafts', 'd']]);
+  g.box(0, 1, 120, 33);
+  g.title(2, 1, 'New message', 'b acc');
+  const field = (y, label, parts) => { g.put(2, y, fit(label, 9), 'd'); g.seq(11, y, parts); };
+  field(2, 'From', [['Mira Holt <mira@example.org>', 'b'], [' ▾', 'acc']]);
+  g.shade(1, 2, 42, 'cur');
+  field(3, 'To', [['bookings@cabins.example.net', '']]);
+  field(4, 'Cc', [['add people', 'd']]);
+  field(5, 'Subject', [['Booking for 14 to 16 November', '']]);
+  g.hline(0, 119, 6);
+  const body = [
+    '', 'Hi,', '',
+    'We would like to book the lakeside cabin for two nights, Friday 14 to',
+    'Sunday 16 November, for two adults.', '',
+    'A few questions:', '',
+    '- Is late check-in after 21:00 possible?',
+    '- Can we bring a small dog?', '',
+    'The floor plan you sent last year is attached. We would like the same',
+    'layout if it is free.', '',
+    'Thanks,', 'Mira',
+  ];
+  body.forEach((l, i) => g.put(4, 7 + i, l, l.startsWith('- ') ? '' : ''));
+  g.put(8, 22, ' ', 'bc');
+  g.hline(0, 119, 30);
+  g.seq(2, 31, [[fit('Attach', 9), 'd'], ['floorplan-2025.pdf', 'cyn u'], ['  212 KB', 'd'], ['    ', ''], ['Del', 'k'], [' remove   ', 'd'], ['^o a', 'k'], [' add a file', 'd']]);
+  g.seq(2, 32, [[fit('Format', 9), 'd'], ['markdown, sent as HTML with a plain text part', ''], ['    ', ''], ['^o p', 'k'], [' preview', 'd']]);
+
+  /* From picker, anchored to the right of the From field */
+  const px = 46, py = 2, pw = 72, ph = 15;
+  g.clear(px, py, pw, ph);
+  g.box(px, py, pw, ph, 'acc');
+  g.title(px + 2, py, 'Send as', 'b acc');
+  g.right(py, [[' Tab: next group ', 'd']], px + pw - 3);
+  const lim = px + pw - 1;
+  const ix = px + 1, iw = pw - 2;
+  const opt = (y, parts, tag, cls = '') => {
+    g.seq(ix, y, parts, lim);
+    if (tag) g.right(y, [[tag, 'd']], lim - 1);
+  };
+  opt(py + 1, [['   Identities and aliases', 'd']], '');
+  opt(py + 2, [['   Mira Holt <mira@example.org>', '']], 'default');
+  opt(py + 3, [['   Mira Holt <hello@example.org>', '']], 'alias');
+  opt(py + 4, [['   Mira at work <mira.holt@work.example.com>', '']], 'identity');
+  g.hline(px, px + pw - 1, py + 5, 'acc');
+  opt(py + 6, [['   Masked Email', 'd']], '');
+  opt(py + 7, [[' ▸ ', 'acc b'], ['+ New masked email for cabins.example.net', 'b']], '');
+  g.right(py + 7, [['^o m', 'k']], lim - 1);
+  g.shade(ix, py + 7, iw, 'cur');
+  opt(py + 8, [['     description  ', 'd'], ['Lakeside cabins', ''], [' ', 'bc'], ['   (required)', 'd']], '');
+  opt(py + 9, [['     created as enabled, so it does not expire after 24 h', 'd']], '');
+  opt(py + 10, [['     site set to cabins.example.net', 'd']], '');
+  opt(py + 11, [['   Masked emails used with this recipient: none', 'd']], '');
+  opt(py + 12, [['   Show all masked emails (86 enabled)', '']], '');
+  g.right(py + 12, [['/', 'k'], [' search', 'd']], lim - 1);
+  opt(py + 13, [['   ! Sending as a mask over JMAP is not yet tested', 'yel']], '');
+
+  statusLine(g, 34, [['✓', 'grn'], [' Draft saved 3 s ago', 'd'], ['  (Drafts, via JMAP)', 'd']], [['72 words', 'd'], ['   ', ''], ['✓', 'grn'], [' synced via JMAP push', 'd']]);
+  hintBar(g, 35, [['Tab', 'next field'], ['^o s', 'send'], ['^s', 'save'], ['^o a', 'attach'], ['^o m', 'new mask'],
+    ['^o e', '$EDITOR'], ['^o d', 'discard'], ['Esc', 'leave field']]);
+  return g;
+}
+
+/* ---------- Screen 4a: command palette ---------- */
+
+function matchParts(s, q, base, hl) {
+  const lower = s.toLowerCase();
+  const idx = new Set();
+  const at = lower.indexOf(q);
+  if (at >= 0) for (let i = 0; i < q.length; i++) idx.add(at + i);
+  else { let j = 0; for (let i = 0; i < s.length && j < q.length; i++) if (lower[i] === q[j]) { idx.add(i); j++; } }
+  const parts = [];
+  let buf = '', on = null;
+  [...s].forEach((c, i) => {
+    const h = idx.has(i);
+    if (h !== on && buf) { parts.push([buf, on ? hl : base]); buf = ''; }
+    on = h; buf += c;
+  });
+  if (buf) parts.push([buf, on ? hl : base]);
+  return parts;
+}
+
+function buildPalette() {
+  const g = baseMail120('palette');
+  g.dimAll();
+  statusLine(g, 34, [['8 of 312 commands match "new"', 'd']], [['✓', 'grn'], [' synced via JMAP push', 'd']]);
+  hintBar(g, 35, [['Up/Down', 'move'], ['Enter', 'run'], ['Tab', 'complete'], ['^n/^p', 'next/prev'], ['Esc', 'close']]);
+  const px = 18, py = 4, pw = 84, ph = 16;
+  g.clear(px, py, pw, ph);
+  g.box(px, py, pw, ph, 'acc');
+  g.title(px + 2, py, 'Commands', 'b acc');
+  g.right(py, [[' : or Ctrl-k ', 'd']], px + pw - 3);
+  const lim = px + pw - 1;
+  g.seq(px + 2, py + 1, [['> ', 'acc b'], ['new', 'b'], [' ', 'bc']], lim);
+  g.hline(px, px + pw - 1, py + 2, 'acc');
+  const items = [
+    ['Compose: new message', 'c', 'compose'],
+    ['Rule: new from this message (Juniper Tran)', 'F', 'rules'],
+    ['Masked email: new address for a site', '', 'masked'],
+    ['Masked email: new for this sender\'s domain', '', 'masked'],
+    ['Go to: Newsletters', 'g f', 'mailbox'],
+    ['Search: Newsletters, unread', '', 'saved search'],
+    ['Contact: Nia Newell <nia@example.net>', '', 'contact'],
+    ['Label: news', 'l', 'label'],
+  ];
+  items.forEach(([name, key, kind], i) => {
+    const y = py + 3 + i;
+    const cur = i === 0;
+    g.put(px + 2, y, cur ? '▸' : ' ', 'acc b', lim);
+    g.seq(px + 4, y, matchParts(name, 'new', cur ? 'b' : '', 'yel b'), lim);
+    g.put(px + 56, y, fit(key, 8), 'k', lim);
+    g.put(px + 66, y, fit(kind, 14), 'd', lim);
+    if (cur) g.shade(px + 1, y, pw - 2, 'cur');
+  });
+  g.hline(px, px + pw - 1, py + 12, 'acc');
+  g.seq(px + 2, py + 13, [['Each row shows its key, so the palette teaches the shortcuts.', 'd']], lim);
+  g.seq(px + 2, py + 14, [['Also searches: mailboxes, saved searches, contacts, rules, masked addresses.', 'd']], lim);
+  return g;
+}
+
+/* ---------- Screen 4b: search ---------- */
+
+function buildSearch() {
+  const g = new Grid('search', 120, 36);
+  topBar(g, [['mira@example.org', 'd'], ['   '], ['Search', 'b']], [['all mailboxes', 'd']]);
+  g.box(0, 1, 120, 33);
+  g.title(2, 1, 'Search', 'b acc');
+  g.seq(2, 2, [['/ ', 'acc b'], ['from:larkspur has:attachment after:2025-06-01', 'b'], [' ', 'bc']]);
+  g.right(2, [['Fastmail search syntax', 'd']], 118);
+  g.hline(0, 119, 3);
+  g.seq(2, 4, [[fit('Filters', 9), 'd'], ['[from: larkspur]', 'cyn'], ['  ', ''], ['[has: attachment]', 'cyn'], ['  ', ''], ['[after: 2025-06-01]', 'cyn'], ['     ', ''], ['Tab', 'k'], [' edit chips', 'd']]);
+  g.seq(2, 5, [[fit('JMAP', 9), 'd'], ['Email/query  filter: {"operator":"AND","conditions":[{"from":"larkspur"},', '']]);
+  g.seq(2, 6, [[fit('', 9), 'd'], ['             {"hasAttachment":true},{"after":"2025-06-01T00:00:00Z"}]}', '']]);
+  g.seq(2, 7, [[fit('', 9), 'd'], ['             sort: receivedAt descending   collapseThreads: true', 'd']]);
+  g.hline(0, 119, 8);
+  g.seq(2, 9, [[fit('Results', 9), 'd'], ['5 local in 3 ms', 'grn'], [', then ', 'd'], ['3 more from the server', 'yel'], [' (Email/query, 180 ms)', 'd']]);
+  g.right(9, [['Enter', 'k'], [' open as a list', 'd']], 118);
+  const cols = (src, date, from, subj, file, size) => fit(src, 7) + ' ' + fit(date, 10) + '  ' + fit(from, 20) + '  ' + fit(subj, 40) + '  ' + fit(file, 19) + rfit(size, 7);
+  g.put(3, 11, cols('source', 'date', 'from', 'subject', 'attachment', 'size'), 'd');
+  const rows = [
+    ['local', 'Fri 09:12', 'Larkspur Support', 'Re: Your order 48213 has shipped', 'invoice-48213.pdf', '84 KB'],
+    ['local', 'Oct 20', 'Larkspur Outfitters', 'Order 48213 confirmed', 'order-48213.pdf', '61 KB'],
+    ['local', 'Oct 8', 'Larkspur Outfitters', 'Receipt for order 47720', 'receipt-47720.pdf', '58 KB'],
+    ['local', 'Sep 14', 'Larkspur Outfitters', 'Returns label for order 47188', 'label-47188.pdf', '102 KB'],
+    ['local', 'Aug 30', 'Larkspur Outfitters', 'Receipt for order 47188', 'receipt-47188.pdf', '57 KB'],
+    ['server', '2025-07-12', 'Larkspur Outfitters', 'Summer catalogue', 'catalogue.pdf', '4.2 MB'],
+    ['server', '2025-06-28', 'Larkspur Support', 'Re: Exchange for size 9', 'exchange-form.pdf', '33 KB'],
+    ['server', '2025-06-03', 'Larkspur Outfitters', 'Receipt for order 45120', 'receipt-45120.pdf', '59 KB'],
+  ];
+  rows.forEach((r, i) => {
+    const y = 12 + i;
+    const line = cols(...r);
+    g.put(1, y, i === 0 ? '▸' : ' ', 'acc b');
+    g.put(3, y, line.slice(0, 7), r[0] === 'local' ? 'grn' : 'yel');
+    g.put(10, y, line.slice(7), i === 0 ? 'b' : '');
+    if (i === 0) g.shade(1, y, 118, 'cur');
+  });
+  g.put(3, 21, 'The local index covers the last 6 months. Older matches come from the server and are cached when opened.', 'd');
+  g.hline(0, 119, 23);
+  g.title(2, 23, 'Syntax and the JMAP filter it becomes', 'd');
+  const syn = [
+    ['from:name', 'from', 'is:unread', 'notKeyword $seen'],
+    ['to:name', 'to OR cc OR bcc (JMAP to is To only)', 'is:pinned', 'hasKeyword $flagged'],
+    ['subject:word', 'subject', 'in:Receipts', 'inMailbox <mailbox id>'],
+    ['has:attachment', 'hasAttachment', 'before: after:', 'before, after (UTC dates)'],
+    ['"exact phrase"', 'text', '-word', 'operator NOT'],
+    ['word OR word', 'operator OR', 'deliveredto:', 'header X-Delivered-To (untested)'],
+  ];
+  syn.forEach((r, i) => {
+    g.seq(3, 25 + i, [[fit(r[0], 16), 'cyn'], [fit(r[1], 42), ''], [fit(r[2], 17), 'cyn'], [fit(r[3], 40), '']]);
+  });
+  g.put(3, 32, 'Operators without a JMAP equivalent are marked, so a result set is never silently wider than asked.', 'd');
+  statusLine(g, 34, [['8 results, 1 selected', 'd']], [['✓', 'grn'], [' synced via JMAP push', 'd']]);
+  hintBar(g, 35, [['Enter', 'open'], ['Up/Down', 'results'], ['Tab', 'chips'], ['^s', 'save search'], ['Esc', 'close'], ['?', 'syntax help']]);
+  return g;
+}
+
+/* ---------- Screen 5: rules, 160 x 40 ---------- */
+
+function sieveParts(line) {
+  if (line.trim().startsWith('#')) return [[line, 'd']];
+  const parts = [];
+  const re = /("(?:[^"\\]|\\.)*")|(:[a-z_-]+)|\b(if|anyof|allof|not|exists|address|header|fileinto|addflag|false|true)\b|(#.*$)/g;
+  let last = 0, m;
+  while ((m = re.exec(line))) {
+    if (m.index > last) parts.push([line.slice(last, m.index), '']);
+    parts.push([m[0], m[1] ? 'grn' : m[2] ? 'cyn' : m[3] ? 'acc' : 'd']);
+    last = re.lastIndex;
+  }
+  if (last < line.length) parts.push([line.slice(last), '']);
+  return parts;
+}
+
+function buildRules() {
+  const g = new Grid('rules', 160, 40);
+  topBar(g, [['mira@example.org', 'd'], ['   '], ['Rules (Sieve)', 'b']], [['mejl block v7', 'd'], ['   ', ''], ['last copied v6, Oct 20', 'yel']]);
+  g.box(0, 1, 160, 37);
+  g.title(2, 1, 'Rules', 'b acc');
+  g.seq(2, 2, [['! Paste required.', 'yel b'], [' Fastmail has no public API for rules or Sieve, so mejl cannot write or read your server script.', 'yel']]);
+  g.seq(2, 3, [['  The mejl block changed since you last copied it (v6, Oct 20, 2 changes). Press ', 'd'], ['P', 'k'],
+    [' to copy it and open Settings > Filters & Rules.', 'd']]);
+  g.hline(0, 159, 4);
+  const LX = 40, VX = 101, EY = 15;
+  g.vline(LX, 4, 37);
+  g.hline(LX, 159, EY);
+  g.vline(VX, EY, 37);
+
+  /* left: rule list and context */
+  const ll = LX;
+  g.title(2, 4, 'mejl rules (4)', 'b acc');
+  const rules = [
+    ['✓', 'Newsletters', '', 0],
+    ['✓', 'Receipts to folder', '*', 1],
+    ['✓', 'Garden club label', '', 0],
+    ['✗', 'Old promo', 'off', 0],
+  ];
+  rules.forEach(([st, name, tag, cur], i) => {
+    const y = 6 + i;
+    g.put(1, y, cur ? '▸' : ' ', 'acc b', ll);
+    g.put(3, y, st, st === '✓' ? 'grn' : 'red', ll);
+    g.put(5, y, fit(name, 28), cur ? 'b' : (st === '✗' ? 'd' : ''), ll);
+    g.put(34, y, rfit(tag, 4), tag === '*' ? 'yel b' : 'd', ll);
+    if (cur) g.shade(1, y, LX - 1, 'cur');
+  });
+  g.seq(3, 11, [['* changed since last copy', 'd']], ll);
+  g.seq(3, 12, [['n', 'k'], [' new  ', 'd'], ['J/K', 'k'], [' order  ', 'd'], ['Space', 'k'], [' on/off', 'd']], ll);
+
+  g.hline(0, LX, 14);
+  g.title(2, 14, 'Fastmail UI rules', 'd');
+  g.put(3, 15, 'Not readable by mejl: there is no', 'd', ll);
+  g.put(3, 16, 'public rules API. Edit them in', 'd', ll);
+  g.seq(3, 17, [['Fastmail: ', 'd'], ['o', 'k'], [' opens Filters & Rules', 'd']], ll);
+
+  g.hline(0, LX, 19);
+  g.title(2, 19, 'Where the block runs', 'd');
+  const order = [
+    ['require line', 'generated', 0],
+    ['your code (top)', 'custom', 0],
+    ['blocked senders', 'generated', 0],
+    ['masked email', 'generated', 0],
+    ['spam, address rules', 'generated', 0],
+    ['mejl block', 'custom', 1],
+    ['Fastmail UI rules', 'generated', 0],
+    ['your code (bottom)', 'custom', 0],
+  ];
+  order.forEach(([a, b, me], i) => {
+    const y = 20 + i;
+    g.put(1, y, me ? '▸' : ' ', 'acc b', ll);
+    g.put(3, y, fit(a, 22), me ? 'b acc' : '', ll);
+    g.put(26, y, fit(b, 11), me ? 'acc' : 'd', ll);
+  });
+  g.put(3, 28, 'Paste below spam protection.', 'd', ll);
+  g.put(3, 29, 'Order from samples, unconfirmed.', 'd', ll);
+
+  g.hline(0, LX, 30);
+  g.title(2, 30, 'Paste status', 'd');
+  g.seq(3, 31, [[fit('local block', 14), 'd'], ['v7, 2 changes', '']], ll);
+  g.seq(3, 32, [[fit('last copied', 14), 'd'], ['v6, Oct 20 18:02', '']], ll);
+  g.seq(3, 33, [[fit('on Fastmail', 14), 'd'], ['unknown', 'yel']], ll);
+  g.seq(3, 35, [['v', 'k'], ['  paste the section back to check', 'd']], ll);
+  g.seq(3, 36, [['P', 'k'], ['  copy block, open Fastmail', 'd']], ll);
+
+  /* right top: editor */
+  const ex = LX + 2, el = 159;
+  g.title(LX + 2, 4, 'Edit rule', 'b acc');
+  const ef = (y, label, parts) => { g.put(ex, y, fit(label, 9), 'd', el); g.seq(ex + 9, y, parts, el); };
+  ef(5, 'Name', [['Receipts to folder', 'b']]);
+  g.right(5, [['✓ enabled', 'grn'], ['   ', ''], ['Space', 'k'], [' toggle', 'd']], 158);
+  ef(6, 'When', [['any', 'b'], [' of these match', ''], ['   ', ''], ['Tab', 'k'], [' all / any', 'd']]);
+  ef(7, '', [[fit('From domain', 16), 'cyn'], [fit('is', 12), 'd'], ['shop.example.com', '']]);
+  ef(8, '', [[fit('Subject', 16), 'cyn'], [fit('contains', 12), 'd'], ['receipt', '']]);
+  g.shade(ex + 8, 8, 60, 'cur');
+  ef(9, '', [['+ add condition', 'acc'], ['   from, to, subject, header, list-id, masked address, size, date', 'd']]);
+  ef(10, 'Then', [['Move to Receipts', ''], ['    ', ''], ['Mark read', ''], ['    ', ''], ['+ add action', 'acc']]);
+  ef(11, 'Stop', [['off', ''], ['   ', ''], ['! stop here also skips Fastmail UI rules, notifications, calendar handling and vacation', 'yel']]);
+  ef(12, 'Runs', [['in the custom section directly below spam protection, before Fastmail UI rules', 'd']]);
+  ef(13, 'Checks', [['✓ parses', 'grn'], ['   ', ''], ['✓ only extensions in Fastmail\'s require line', 'grn'], ['   ', ''], ['✓ no keep', 'grn'], ['   ', ''], ['✓ no discard', 'grn'], ['   ', ''], ['✓ no require', 'grn']]);
+
+  /* right bottom left: Sieve preview */
+  g.title(LX + 2, EY, 'Sieve preview, read-only', 'd');
+  g.right(EY, [[' 21 lines ', 'd']], VX - 1);
+  const sieve = [
+    '# >>> mejl managed block v1 (do not edit by hand) >>>',
+    '# mejl:rule id=r_18aa name="Newsletters" enabled=1',
+    'if address :domain :is "from" "news.example.net" {',
+    '  fileinto :mailboxid "M2a90" "INBOX.Newsletters";',
+    '}',
+    '# mejl:rule id=r_2c41 name="Receipts to folder" enabled=1',
+    'if anyof (address :domain :is "from" "shop.example.com",',
+    '          header :contains "subject" "receipt") {',
+    '  addflag "\\\\Seen";',
+    '  fileinto :mailboxid "M7d1e" "INBOX.Receipts";',
+    '}',
+    '# mejl:rule id=r_5d07 name="Garden club label" enabled=1',
+    'if header :contains "list-id" "garden-club.example.org" {',
+    '  fileinto :copy :mailboxid "M4c3b" "INBOX.Garden club";',
+    '}',
+    '# mejl:rule id=r_77e2 name="Old promo" enabled=0',
+    'if false # address :domain :is "from" "promo.example.com"',
+    '{',
+    '  fileinto :specialuse "\\\\Trash" "INBOX.Trash";',
+    '}',
+    '# <<< mejl managed block v1 sha256=9c2e41b7d0 <<<',
+  ];
+  sieve.forEach((l, i) => {
+    const y = EY + 1 + i;
+    g.seq(LX + 2, y, sieveParts(l), VX);
+    if (i >= 5 && i <= 10) g.put(LX + 1, y, '▸', 'acc');
+  });
+
+  /* right bottom right: dry run */
+  const dx = VX + 2, dl = 159;
+  g.title(VX + 2, EY, 'Dry run', 'b acc');
+  g.put(dx, EY + 1, 'Receipts to folder against 2,000 cached messages', 'b', dl);
+  g.put(dx, EY + 2, 'last 90 days, local Sieve parser, 6 ms', 'd', dl);
+  g.seq(dx, EY + 3, [['14 would match', 'grn b'], ['   2 already in Receipts', 'd']], dl);
+  const dr = [
+    ['Fri', 'Larkspur Support', 'Re: Your order 48213 has shipped'],
+    ['Oct 20', 'Larkspur Outfitters', 'Order 48213 confirmed'],
+    ['Oct 8', 'Larkspur Outfitters', 'Receipt for order 47720'],
+    ['Oct 3', 'Maple Street Co-op', 'Your receipt for October'],
+    ['Sep 29', 'Example Hosting', 'Receipt: example.org renewal'],
+    ['Sep 14', 'Larkspur Outfitters', 'Returns label for order 47188'],
+    ['Aug 30', 'Larkspur Outfitters', 'Receipt for order 47188'],
+    ['Aug 12', 'Northgate Library', 'Receipt for your late fee'],
+  ];
+  dr.forEach((r, i) => {
+    const y = EY + 5 + i;
+    g.seq(dx, y, [[fit(r[0], 7), 'd'], [fit(r[1], 16) + ' ', ''], [fit(r[2], 19), ''], [' -> ', 'd'], ['Receipts', 'acc']], dl);
+  });
+  g.seq(dx, EY + 13, [['⋯ 6 more', 'd'], ['   ', ''], ['j/k', 'k'], [' scroll  ', 'd'], ['Enter', 'k'], [' open message', 'd']], dl);
+  g.seq(dx, EY + 15, [['a', 'k'], ['  apply to these 14 now (Email/set, undo with z)', '']], dl);
+  g.seq(dx, EY + 16, [['t', 'k'], ['  test against one message', '']], dl);
+  g.put(dx, EY + 18, 'Simulates the mejl block only, using stored', 'd', dl);
+  g.put(dx, EY + 19, 'headers. Fastmail\'s generated blocks (spam,', 'd', dl);
+  g.put(dx, EY + 20, 'masked email, UI rules) are not simulated.', 'd', dl);
+
+  statusLine(g, 38, [['Rule saved locally.', 'd'], ['  2 changes are not on Fastmail yet.', 'yel']], [['✓', 'grn'], [' synced via JMAP push', 'd']]);
+  hintBar(g, 39, [['n', 'new'], ['Enter', 'edit'], ['Space', 'on/off'], ['J/K', 'reorder'], ['t', 'dry run'], ['a', 'apply to existing'],
+    ['P', 'copy block, open Fastmail'], ['v', 'paste back to check'], ['Esc', 'back'], ['?', 'help']]);
+  return g;
+}
+
+/* ---------- Screen 6: Masked Email, 120 x 36 ---------- */
+
+function buildMasked() {
+  const g = new Grid('masked', 120, 36);
+  topBar(g, [['mira@example.org', 'd'], ['   '], ['Masked Email', 'b']], [['mask domain: example.org (account setting)', 'd']]);
+  g.box(0, 1, 120, 33);
+  g.title(2, 1, 'Masked Email  122 addresses', 'b acc');
+  g.seq(2, 2, [['86', 'grn b'], [' enabled   ', 'd'], ['12', 'red b'], [' disabled   ', 'd'], ['3', 'b'], [' pending   ', 'd'], ['21', 'b'], [' deleted', 'd'],
+    ['        ', ''], ['14', 'b'], [' silent for 6+ months   ', 'd'], ['2', 'yel b'], [' got spam this week', 'd']]);
+  g.seq(2, 3, [['Show ', 'd'], ['1', 'k'], [' ✓ enabled  ', ''], ['2', 'k'], [' ✓ disabled  ', ''], ['3', 'k'], [' ✓ pending  ', ''], ['4', 'k'], [' ✓ deleted', ''],
+    ['     silent: any   created by: any   sort: last message', 'd']]);
+  g.seq(2, 4, [['/ ', 'acc b'], ['search address, description or site', 'd']]);
+  g.right(4, [['default view hides pending and deleted, as Fastmail does', 'd']], 118);
+  g.hline(0, 119, 5);
+  const cols = (st, addr, desc, site, last, by, mail) =>
+    fit(st, 10) + ' ' + fit(addr, 30) + ' ' + fit(desc, 19) + ' ' + fit(site, 21) + ' ' + rfit(last, 7) + '  ' + fit(by, 11) + rfit(mail, 6);
+  g.put(2, 6, cols('state', 'address', 'description', 'site', 'last', 'created by', 'mail'), 'd');
+  const rows = [
+    ['✓ enabled', 'kettle.fern4821@example.org', 'Larkspur shop', 'shop.example.com', '09:12', 'mejl', '23', ''],
+    ['✓ enabled', 'bright.otter2207@example.org', 'Northgate Library', 'library.example.org', '07:30', 'web', '41', ''],
+    ['✓ enabled', 'maple.drift5513@example.org', 'Kestrel Bank', 'bank.example.com', 'Tue', 'pw manager', '64', '!'],
+    ['✗ disabled', 'quiet.heron7731@example.org', 'Promo contest', 'win.example.net', '2d', 'web', '312', ''],
+    ['✓ enabled', 'amber.loom3390@example.org', 'Harbor Dental', 'dental.example.com', 'Oct 16', 'mejl', '9', ''],
+    ['◦ pending', 'cedar.pixel0408@example.org', '', 'cabins.example.net', 'never', 'pw manager', '0', ''],
+    ['✓ enabled', 'violet.quay6641@example.org', 'Calder Insurance', 'insure.example.com', 'Sep 25', 'web', '17', ''],
+    ['✓ enabled', 'sunny.flax1189@example.org', 'Tessellate Weekly', 'news.example.net', 'Thu', 'mejl', '112', ''],
+    ['✗ disabled', 'rusty.gale9024@example.org', 'Old forum', 'forum.example.net', '4 mo', 'web', '88', ''],
+    ['✓ enabled', 'minty.cove3317@example.org', 'Wren Analytics', 'wren.example.com', 'Oct 14', 'mejl', '30', ''],
+    ['- deleted', 'hazel.brook5150@example.org', 'Breached shop', 'leaky.example.com', '1 yr', 'web', '204', ''],
+    ['✓ enabled', 'pearl.moss7720@example.org', 'Conference 2025', 'conf.example.org', '11 mo', 'web', '6', ''],
+    ['✓ enabled', 'tidal.fig4402@example.org', 'Maple Street Co-op', 'coop.example.org', 'Oct 3', 'web', '12', ''],
+    ['- deleted', 'stony.wick2815@example.org', 'Old phone plan', 'mobile.example.net', '2 yr', 'web', '51', ''],
+  ];
+  rows.forEach((r, i) => {
+    const y = 7 + i;
+    const cur = i === 0;
+    const st = r[0];
+    const stCls = st.startsWith('✓') ? 'grn' : st.startsWith('✗') ? 'red' : 'd';
+    const line = cols(r[0], r[1], r[2] || '(no description)', r[3], r[4], r[5], r[6]);
+    g.put(1, y, cur ? '▸' : ' ', 'acc b');
+    g.put(2, y, line.slice(0, 10), stCls);
+    const dim = st.startsWith('-') || st.startsWith('◦');
+    g.put(13, y, line.slice(11, 41), dim ? 'd' : 'mag');
+    g.put(44, y, line.slice(42), dim ? 'd' : (cur ? 'b' : ''));
+    if (!r[2]) g.put(44, y, fit('(no description)', 19), 'd');
+    if (r[7]) g.put(116, y, r[7], 'yel b');
+    if (cur) g.shade(1, y, 118, 'cur');
+  });
+  g.hline(0, 119, 21);
+  g.title(2, 21, 'kettle.fern4821@example.org', 'mag b');
+  const D = (y, label, parts) => { g.put(3, y, fit(label, 10), 'd'); g.seq(13, y, parts); };
+  D(22, 'name', [['Larkspur shop', 'b'], ['    ', ''], ['✓ enabled', 'grn']]);
+  D(23, 'site', [['https://shop.example.com', ''], ['    created 2025-03-14 by mejl    last mail today 09:12', 'd']]);
+  D(24, 'mail', [['23 messages in the local index: 21 Receipts, 2 Archive, 0 Spam, 0 Trash', '']]);
+  D(25, 'senders', [['orders@shop.example.com (19), help@shop.example.com (4)', '']]);
+  D(26, 'check', [['✓ every sender matches the site', 'grn']]);
+  D(27, 'note', [['! on Kestrel Bank: 1 message from pay.example.org, which is not the bank\'s site', 'yel']]);
+  g.seq(3, 29, [['e', 'k'], [' enable   ', 'd'], ['x', 'k'], [' disable   ', 'd'], ['D', 'k'], [' delete   ', 'd'], ['r', 'k'], [' rename   ', 'd'],
+    ['Enter', 'k'], [' show messages   ', 'd'], ['y', 'k'], [' copy address   ', 'd'], ['R', 'k'], [' rule for this address', 'd']]);
+  g.put(3, 31, 'Disabled masks file new mail in Trash and can be re-enabled. Deleted masks bounce; restore over the API is untested.', 'd');
+  statusLine(g, 34, [['Disabled quiet.heron7731@example.org. Future mail goes to Trash.', 'yel'], ['  ', ''], ['z', 'k'], [' undo', 'd']],
+    [['refreshed 2 min ago (full MaskedEmail/get)', 'd']]);
+  hintBar(g, 35, [['j/k', 'move'], ['/', 'search'], ['1-4', 'state filter'], ['n', 'new'], ['e', 'enable'], ['x', 'disable'],
+    ['D', 'delete'], ['r', 'rename'], ['Enter', 'messages'], ['y', 'copy'], ['?', 'help']]);
+  return g;
+}
+
+/* ---------- Screen 7: narrow, 80 x 24 ---------- */
+
+function buildNarrow() {
+  const g = new Grid('narrow', 80, 24);
+  topBar(g, [['Inbox ▾', 'b'], ['  12 unread', 'd']], [['? help', 'd']]);
+  g.box(0, 1, 80, 21);
+  g.title(2, 1, 'Inbox', 'b acc');
+  CONVS.slice(0, 19).forEach((c, i) => listItem(g, 1, 2 + i, 78, c, { sel: false, preview: false, sw: 20 }));
+  scrollbar(g, 79, 2, 20, 0, 5);
+  statusLine(g, 22, [['✓', 'grn'], [' synced via JMAP push', 'd']], [['1 of 214', 'd']]);
+  hintBar(g, 23, [['j/k', 'move'], ['o', 'open'], ['y', 'archive'], ['d', 'trash'], ['r', 'reply'], ['/', 'search'], [':', 'cmds'], ['g', 'go'], ['?', 'help']]);
+  return g;
+}
+
+/* ---------- Screen 8: which-key, 120 x 36 ---------- */
+
+function buildWhichKey() {
+  const g = baseMail120('whichkey');
+  statusLine(g, 34, [['✓', 'grn'], [' synced via JMAP push', 'd']], [['pending: ', 'd'], ['g', 'k']]);
+  hintBar(g, 35, [['g', 'go to: press a key'], ['Esc', 'cancel'], ['?', 'all keys']]);
+  const px = 70, py = 17, pw = 50, ph = 16;
+  g.clear(px, py, pw - 1, ph);
+  g.box(px, py, pw, ph, 'acc');
+  g.title(px + 2, py, 'g  go to', 'b acc');
+  const lim = px + pw - 1;
+  const two = (y, a, b) => {
+    if (a) g.seq(px + 2, y, [[a[0], 'k'], ['  ' + fit(a[1], 18), '']], lim);
+    if (b) g.seq(px + 25, y, [[b[0], 'k'], ['  ' + fit(b[1], 18), '']], lim);
+  };
+  two(py + 2, ['i', 'Inbox'], ['t', 'Trash']);
+  two(py + 3, ['a', 'Archive'], ['j', 'Spam']);
+  two(py + 4, ['s', 'Sent'], ['f', 'pick a mailbox'], 0);
+  two(py + 5, ['d', 'Drafts'], ['g', 'top of list']);
+  g.put(px + 2, py + 7, 'mejl tools', 'd', lim);
+  two(py + 8, ['r', 'Rules (Sieve)'], ['m', 'Masked Email']);
+  two(py + 9, [',', 'Settings'], null);
+  g.hline(px, px + pw - 1, py + 11, 'acc');
+  g.seq(px + 2, py + 12, [['Esc', 'k'], [' cancel   no timeout: g does nothing alone', 'd']], lim);
+  g.seq(px + 2, py + 13, [['Same popup for ', 'd'], ['.', 'k'], [' mark  ', 'd'], ['*', 'k'], [' select  ', 'd'], ['^o', 'k'], [' compose', 'd']], lim);
+  return g;
+}
+
+/* ---------- Checks ---------- */
+
+const SAFE = new Set([...'▸▾◦⚑✓✗↩↪⋯']);
+function safeChar(c) {
+  const n = c.codePointAt(0);
+  return (n >= 0x20 && n <= 0x7e) || (n >= 0x2500 && n <= 0x257f) || SAFE.has(c);
+}
+function checkGrid(g) {
+  const errs = g.issues.slice();
+  g.lines().forEach((line, y) => {
+    const n = len(line);
+    if (n !== g.w) errs.push(`row ${y} is ${n} cells, expected ${g.w}`);
+    for (const c of line) if (!safeChar(c)) errs.push(`row ${y}: glyph U+${c.codePointAt(0).toString(16).toUpperCase()} is outside the safe set`);
+  });
+  return errs;
+}
+
+const SCREENS = [
+  { id: 'inbox', title: 'mejl, inbox, wide layout', build: buildInbox, label: 'Inbox in three panes: mailboxes, conversation list and reader preview.' },
+  { id: 'reader', title: 'mejl, reader', build: buildReader, label: 'Reader showing an HTML order update as text, with link footnotes and a Masked Email side panel.' },
+  { id: 'compose', title: 'mejl, compose', build: buildCompose, label: 'Compose screen with the From picker open on a new masked email option.' },
+  { id: 'palette', title: 'mejl, command palette', build: buildPalette, label: 'Fuzzy command palette over a dimmed inbox, filtered by the word new.' },
+  { id: 'search', title: 'mejl, search', build: buildSearch, label: 'Search with Fastmail syntax, the JMAP filter it becomes, and merged local and server results.' },
+  { id: 'rules', title: 'mejl, rules', build: buildRules, label: 'Rules manager with a rule list, an editor, a generated Sieve preview, a dry run and a paste status.' },
+  { id: 'masked', title: 'mejl, Masked Email', build: buildMasked, label: 'Masked Email manager with state filters, a table of addresses and details for the selected one.' },
+  { id: 'narrow', title: 'mejl, inbox, narrow', build: buildNarrow, label: 'Inbox at 80 by 24 cells in a single pane.' },
+  { id: 'whichkey', title: 'mejl, which-key popup', build: buildWhichKey, label: 'Which-key popup listing the follow-up keys after pressing g.' },
+];
+
+const BUILT = SCREENS.map((s) => {
+  const g = s.build();
+  return { s, g, errs: checkGrid(g) };
+});
+
+/* ---------- Rendering ---------- */
+
+function esc(c) { return c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c; }
+function renderRows(g, boxed) {
+  let html = '';
+  for (let y = 0; y < g.h; y++) {
+    let row = '', cur = null, buf = '';
+    const flush = () => { if (buf) row += cur ? `<span class="${cur}">${buf}</span>` : buf; buf = ''; };
+    for (let x = 0; x < g.w; x++) {
+      const c = g.cell(x, y);
+      const k = (g.fg[y][x] + ' ' + g.bg[y][x]).trim();
+      if (k !== cur) { flush(); cur = k; }
+      buf += boxed.has(c) ? `<span class="w">${c}</span>` : esc(c);
+    }
+    flush();
+    html += `<span class="r"><span class="ln">${row}</span></span>`;
+  }
+  return html;
+}
+
+/* Glyphs the terminal font draws at exactly one cell stay plain text. Any glyph that
+   falls back to another font with a different width is boxed into one cell. */
+function boxedGlyphs() {
+  const used = new Set();
+  for (const { g } of BUILT) for (const line of g.lines()) for (const c of line) if (c.codePointAt(0) > 126) used.add(c);
+  const host = document.createElement('div');
+  host.className = 'term';
+  host.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden';
+  host.style.setProperty('--fs', getComputedStyle(document.documentElement).getPropertyValue('--grid-fs') || '12px');
+  document.body.appendChild(host);
+  const width = (t) => { const sp = document.createElement('span'); sp.textContent = t.repeat(40); host.appendChild(sp); const w = sp.getBoundingClientRect().width; sp.remove(); return w; };
+  const ref = width('0');
+  const boxed = new Set();
+  for (const c of used) if (Math.abs(width(c) - ref) > 0.25) boxed.add(c);
+  host.remove();
+  return boxed;
+}
+
+function mount() {
+  const boxed = boxedGlyphs();
+  for (const { s, g } of BUILT) {
+    const fig = document.querySelector(`figure[data-grid="${s.id}"]`);
+    if (!fig) continue;
+    fig.innerHTML =
+      `<div class="chrome"><span class="dots"><i></i><i></i><i></i></span><span class="wtitle">${s.title}</span><span class="wsize">${g.w}x${g.h}</span></div>` +
+      `<div class="term" role="img" aria-label="${s.label} Grid of ${g.w} by ${g.h} cells.">${renderRows(g, boxed)}</div>`;
+  }
+  measure();
+}
+
+/* Rendered width check: every row must be exactly cols x cell width. */
+function measure() {
+  const out = [];
+  let rowsChecked = 0;
+  for (const { s, g, errs } of BUILT) {
+    const term = document.querySelector(`figure[data-grid="${s.id}"] .term`);
+    if (!term) continue;
+    const probe = document.createElement('span');
+    probe.textContent = '0'.repeat(100);
+    term.appendChild(probe);
+    const cw = probe.getBoundingClientRect().width / 100;
+    probe.remove();
+    const domErrs = [];
+    term.querySelectorAll('.ln').forEach((ln, y) => {
+      rowsChecked++;
+      const w = ln.getBoundingClientRect().width;
+      if (Math.abs(w - cw * g.w) > 1) domErrs.push(`row ${y} renders ${w.toFixed(1)}px, expected ${(cw * g.w).toFixed(1)}px`);
+    });
+    const all = errs.concat(domErrs);
+    out.push({ id: s.id, w: g.w, h: g.h, errs: all });
+  }
+  const bad = out.filter((o) => o.errs.length);
+  const el = document.getElementById('check-result');
+  if (!bad.length) {
+    console.log(`mejl mock-ups: ${out.length} grids, ${rowsChecked} rows, all exact width, no clipped text, safe glyphs only.`);
+    el.innerHTML = `<span class="badge ok">pass</span> ${out.length} grids and ${rowsChecked} rows checked: ` +
+      out.map((o) => `${o.id} ${o.w}x${o.h}`).join(', ') + '. Every row has the declared width in cells and on screen.';
+  } else {
+    bad.forEach((o) => o.errs.forEach((e) => console.warn(`[${o.id}] ${e}`)));
+    el.innerHTML = `<span class="badge bad">issues</span> ` + bad.map((o) => `${o.id}: ${o.errs.length} issue(s), first: ${esc2(o.errs[0])}`).join('; ');
+  }
+}
+function esc2(s) { return String(s).replace(/[&<>]/g, esc); }
+
+/* ---------- Page controls ---------- */
+
+function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } return null; }
+
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  const b = document.getElementById('theme');
+  b.textContent = t === 'light' ? 'Dark theme' : 'Light theme';
+  b.setAttribute('aria-pressed', t === 'light' ? 'true' : 'false');
+  store('mejl-theme', t);
+}
+function setSize(px) {
+  px = Math.max(9, Math.min(16, px));
+  document.documentElement.style.setProperty('--grid-fs', px + 'px');
+  store('mejl-fs', String(px));
+  return px;
+}
+
+if (typeof document !== 'undefined') {
+  setTheme(store('mejl-theme') === 'light' ? 'light' : 'dark');
+  let fs = setSize(parseInt(store('mejl-fs') || '12', 10) || 12);
+  mount();
+  document.getElementById('theme').addEventListener('click', () => setTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light'));
+  document.getElementById('smaller').addEventListener('click', () => { fs = setSize(fs - 1); mount(); });
+  document.getElementById('bigger').addEventListener('click', () => { fs = setSize(fs + 1); mount(); });
+  const ids = ['inbox', 'reader', 'compose', 'palette', 'rules', 'masked', 'narrow', 'whichkey', 'checks'];
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === 't') setTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+    const n = parseInt(e.key, 10);
+    if (n >= 1 && n <= 9) document.getElementById(ids[n - 1]).scrollIntoView({ behavior: 'smooth' });
+  });
+  const links = [...document.querySelectorAll('nav.tabs a')];
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((en) => {
+      if (!en.isIntersecting) return;
+      links.forEach((a) => a.classList.toggle('on', a.getAttribute('href') === '#' + en.target.id));
+    });
+  }, { rootMargin: '-45% 0px -50% 0px' });
+  document.querySelectorAll('main section').forEach((s) => io.observe(s));
+} else if (typeof module !== 'undefined') {
+  module.exports = { BUILT };
+}
+</script>
+</body>
+</html>

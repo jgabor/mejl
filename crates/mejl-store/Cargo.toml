@@ -1,0 +1,27 @@
+[package]
+name = "mejl-store"
+description = "SQLite cache and state store for mejl: sync application, page reads, local search, outbox with overlays"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+mejl-jmap.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+jiff.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+mejl-fake.workspace = true
+divan.workspace = true
+tokio.workspace = true
+
+[[bench]]
+name = "store"
+harness = false

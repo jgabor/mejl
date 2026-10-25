@@ -1,0 +1,24 @@
+[package]
+name = "mejl-ui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "mejl's terminal UI: state, update, views, keymap, mouse hit testing and themes"
+
+[dependencies]
+mejl-render.workspace = true
+mejl-sieve.workspace = true
+serde_json.workspace = true
+ratatui.workspace = true
+crossterm.workspace = true
+unicode-width.workspace = true
+unicode-segmentation.workspace = true
+toml.workspace = true
+jiff.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+ratatui-textarea.workspace = true
+insta.workspace = true

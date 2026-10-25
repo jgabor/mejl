@@ -1,0 +1,40 @@
+---
+source: crates/mejl-ui/tests/compose.rs
+expression: hs.text()
+---
+ mejl   mira@example.org   New message                                                                  draft in Drafts 
+┌─ New message ────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ From     Mira Holt <mira@example.org> ▾    ┌─ Send as ────────────────────────────────────────── type to filter ──┐  │
+│ To       bookings@cabins.example.net       │ > type to filter                                                     │  │
+│ Cc       add people                        ├──────────────────────────────────────────────────────────────────────┤  │
+│ Subject  Booking for 14 to 16 November     │ ▸ Mira Holt <mira@example.org>                    default            │  │
+├────────────────────────────────────────────│   Mira Holt <hello@example.org>                   identity           │──┤
+│                                            │   Mira at work <mira.holt@work.example.com>       identity           │  │
+│   Hi,                                      │   + New masked email for cabins.example.net       new                │  │
+│                                            │   Masked addresses (9 enabled)                                       │  │
+│   We would like to book the lakeside cabin │   kettle.fern4821@example.org                     Larkspur shop      │  │
+│   Sunday 16 November, for two adults.      │   bright.otter2207@example.org                    Northgate Library  │  │
+│                                            │   maple.drift5513@example.org                     Kestrel Bank       │  │
+│   A few questions:                         │   amber.loom3390@example.org                      Harbor Dental      │  │
+│                                            │   violet.quay6641@example.org                     Calder Insurance   │  │
+│   - Is late check-in after 21:00 possible? │   sunny.flax1189@example.org                      Tessellate Weekly  │  │
+│   - Can we bring a small dog?              │   minty.cove3317@example.org                      Wren Analytics     │  │
+│                                            │   pearl.moss7720@example.org                      Conference 2025    │  │
+│   The floor plan you sent last year is atta│   tidal.fig4402@example.org                       Maple Street Co-⋯  │  │
+│   layout if it is free.                    │                                                                      │  │
+│                                            ├──────────────────────────────────────────────────────────────────────┤  │
+│   Thanks,                                  │ ! Sending as a mask over JMAP is not yet tested                      │  │
+│   Mira                                     └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                                                                      │
+│   --                                                                                                                 │
+│   Mira                                                                                                               │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Attach   floorplan-2025.pdf  212 KB    Del remove   ^o a add a file                                                  │
+│ Format   plain text, sent as text/plain                                                                              │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+ 13 addresses                                                                         58 words   ✓ synced via JMAP push 
+ Up/Down move  Enter use  ^n/^p next/prev  Esc close

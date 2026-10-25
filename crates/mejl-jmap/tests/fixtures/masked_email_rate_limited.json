@@ -1,0 +1,9 @@
+["MaskedEmail/set", {
+  "accountId": "u1234abcd",
+  "oldState": null,
+  "newState": null,
+  "created": null,
+  "notCreated": {
+    "k1": { "type": "rateLimit", "description": "Too many masked email addresses created recently" }
+  }
+}, "s0"]

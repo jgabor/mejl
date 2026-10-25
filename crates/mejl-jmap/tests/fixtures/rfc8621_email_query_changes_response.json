@@ -1,0 +1,11 @@
+[ "Email/queryChanges", {
+  "accountId": "ue150411c",
+  "oldQueryState": "09aa9a075588-780599:0",
+  "newQueryState": "09aa9a075588-780599:3",
+  "total": 3,
+  "removed": [ "Md45b47b4877521042cec0938", "Mb6ef8dbc4dd5ff6dcf3ac7c2" ],
+  "added": [
+    { "id": "Mc4ea4a18d93ae6fe2fa51d60", "index": 0 },
+    { "id": "Md5b0c4f9a8b8ae02bd1e9171", "index": 2 }
+  ]
+}, "0" ]

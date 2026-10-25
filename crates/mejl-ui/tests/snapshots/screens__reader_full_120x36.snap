@@ -1,0 +1,40 @@
+---
+source: crates/mejl-ui/tests/screens.rs
+expression: hs.text()
+---
+ mejl   mira@example.org   Inbox > Re: Your order 48213 has shipped                                            3 of 214 
+┌─ Re: Your order 48213 has shipped ───────────────────────────────────────────────┬─ Delivered to a masked address ───┐
+│ 3 messages, 1 attachment   label: Receipts                                       │ @ kettle.fern4821@example.org     │
+│ ▸ Larkspur Outfitters  Oct 20 16:05  Thanks for your order. Order 48213 is conf⋯ │   Larkspur shop                   │
+│ ▸ Mira Holt (you)      Oct 21 08:31  Hi, could you ship to my work address inst⋯ │   site     shop.example.com       │
+│ ▾ Larkspur Support <help@shop.example.com>                      Fri 23 Oct 09:12 │   state    ✓ enabled              │
+│   to kettle.fern4821@example.org  @ masked: Larkspur shop                        │   created  2025-03-14 by mejl     │
+│   remote images off, 2 trackers blocked                        O open in browser │   last     today 09:12            │
+│                                                                                  │   mail     23 messages, 0 in Spam │
+│      ORDER UPDATE                                                                │   ✓ sender matches the site       │
+│                                                                                  │                                   │
+│      Hi Mira,                                                                    │   @ x  disable: mail goes to Trash│
+│                                                                                  │   @ d  delete: mail bounces       │
+│      Good news: we changed the delivery address and your order has shipped. You  │   @ r  rule for this address      │
+│      can follow the parcel with the link below.                                  │   @ m  all mail to this address   │
+│                                                                                  │   @ y  copy address               │
+│      [ Track your parcel ][1]                                                    ├─ Attachments ─────────────────────┤
+│                                                                                  │   invoice-48213.pdf  84 KB        │
+│      ───────────────────────────┬───┬─────                                       ├─ Sender ──────────────────────────┤
+│      Item                       │Qty│Price                                       │   help@shop.example.com           │
+│      ───────────────────────────┼───┼─────                                       │   not in contacts                 │
+│      Merino hiking socks, 2-pack│1  │18.00                                       │   F  new rule from this message   │
+│      ───────────────────────────┼───┼─────                                       │   M  mute conversation            │
+│      Trail bottle, 750 ml       │2  │24.00                                       │                                   │
+│      ───────────────────────────┼───┼─────                                       │                                   │
+│      Delivery                   │   │0.00                                        │                                   │
+│      ───────────────────────────┼───┼─────                                       │                                   │
+│      Total                      │   │42.00                                       │                                   │
+│      ───────────────────────────┴───┴─────                                       │                                   │
+│                                                                                  │                                   │
+│      Questions? Reply to this email or visit our help centre[2].                 │                                   │
+│                                                                                  │                                   │
+│      Manage your email preferences[3].                                           │                                   │
+└──────────────────────────────────────────────────────────────────────────────────┴───────────────────────────────────┘
+                                                                                       ✓ synced via JMAP push  14:02:31 
+ j/k conversation  n/p message  " quotes  L links  @ masked  y archive  d trash  r reply  u back  ? help

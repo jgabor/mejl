@@ -1,0 +1,49 @@
+[package]
+name = "mejl"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Fast, keyboard-first terminal email client for Fastmail"
+
+[lib]
+name = "mejl"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mejl"
+path = "src/main.rs"
+
+[dependencies]
+mejl-jmap.workspace = true
+mejl-fake.workspace = true
+mejl-render.workspace = true
+mejl-store.workspace = true
+mejl-sync.workspace = true
+mejl-ui.workspace = true
+mejl-sieve.workspace = true
+ratatui.workspace = true
+open.workspace = true
+serde_json.workspace = true
+toml_edit.workspace = true
+tokio.workspace = true
+crossterm = { workspace = true, features = ["event-stream"] }
+futures.workspace = true
+thiserror.workspace = true
+clap.workspace = true
+toml.workspace = true
+etcetera.workspace = true
+keyring.workspace = true
+serde.workspace = true
+jiff.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender.workspace = true
+tempfile.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+signal-hook.workspace = true
+
+[dev-dependencies]

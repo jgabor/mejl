@@ -1,0 +1,66 @@
+---
+source: crates/mejl-sieve/tests/render_golden.rs
+expression: block.text
+---
+# >>> mejl managed block v1 (do not edit by hand) >>>
+# mejl:rule id=r_c00 name="from_all_is" enabled=1
+if address :all :is "from" "orders@shop.example.com" {
+  addflag "\\Flagged";
+}
+# mejl:rule id=r_c01 name="from_domain_is" enabled=1
+if address :domain :is "from" "shop.example.com" {
+  addflag "\\Flagged";
+}
+# mejl:rule id=r_c02 name="from_localpart" enabled=1
+if address :localpart :is "from" "orders" {
+  addflag "\\Flagged";
+}
+# mejl:rule id=r_c03 name="to_contains" enabled=1
+if address :all :contains "to" "team" {
+  addflag "\\Flagged";
+}
+# mejl:rule id=r_c04 name="cc_matches" enabled=1
+if address :all :matches "cc" "*@lists.example.net" {
+  addflag "\\Flagged";
+}
+# mejl:rule id=r_c05 name="to_or_cc_starts" enabled=1
+if address :all :matches ["to", "cc"] "billing+*" {
+  addflag "\\Flagged";
+}
+# mejl:rule id=r_c06 name="to_or_cc_ends" enabled=1
+if address :domain :matches ["to", "cc"] "*.example.org" {
+  addflag "\\Flagged";
+}
+# mejl:rule id=r_c07 name="subject_is" enabled=1
+if header :is "subject" "Weekly digest" {
+  addflag "\\Flagged";
+}
+# mejl:rule id=r_c08 name="list_id" enabled=1
+if header :contains "list-id" "<garden-club.example.org>" {
+  addflag "\\Flagged";
+}
+# mejl:rule id=r_c09 name="named_header" enabled=1
+if header :matches "X-Spam-score" "0.*" {
+  addflag "\\Flagged";
+}
+# mejl:rule id=r_c10 name="delivered_to" enabled=1
+if header :is "x-delivered-to" "shop.k3x9@example.org" {
+  addflag "\\Flagged";
+}
+# mejl:rule id=r_c11 name="size_over_k" enabled=1
+if size :over 100K {
+  addflag "\\Flagged";
+}
+# mejl:rule id=r_c12 name="size_under_m" enabled=1
+if size :under 5M {
+  addflag "\\Flagged";
+}
+# mejl:rule id=r_c13 name="size_over_odd" enabled=1
+if size :over 1500 {
+  addflag "\\Flagged";
+}
+# mejl:rule id=r_c14 name="negated" enabled=1
+if not header :contains "subject" "unsubscribe" {
+  addflag "\\Flagged";
+}
+# <<< mejl managed block v1 sha256=2e11af8be05a9e9cab2dde279745f254799958a91ea5e561747fc6947f5eb43c <<<

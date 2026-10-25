@@ -1,0 +1,40 @@
+---
+source: crates/mejl-ui/tests/search.rs
+expression: hs.text()
+---
+ mejl   mira@example.org   Search                                                                         all mailboxes 
+┌─ Search ─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ / from:larkspur has:attachment deliveredto:shop                                               Fastmail search syntax │
+├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Filters  [from: larkspur]  [has: attachment]  [deliveredto: shop]                                                    │
+│ Local    skipped deliveredto:shop (not in the local index); the server search runs them                              │
+│ JMAP     Email/query  filter: {"operator":"AND","conditions":[{"from":"larkspur"},{"hasAttachment":true},            │
+│                       {"header":["X-Delivered-To","shop"]}]}                                                         │
+│                       sort: receivedAt descending   collapseThreads: true                                            │
+├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Results  1 local, then 1 more from the server                                                   Enter open as a list │
+│                                                                                                                      │
+│  source  date        from                  subject                                                                   │
+│▸ local   09:12       Larkspur Support      Re: Your order 48213 has shipped  Good news: we changed the delivery add⋯ │
+│  server  Sep 2       Owen Castillo         Gutter quote  Quote for the gutters attached                              │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│  Local results cover cached mail. Older matches come from the server and are cached when opened.                     │
+│                                                                                                                      │
+├─ Syntax ─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                                                      │
+│  from:name       sender                                    is:unread        unread                                   │
+│  to:name         To, Cc or Bcc                             is:pinned        pinned                                   │
+│  subject:word    subject                                   in:Receipts      in a mailbox                             │
+│  has:attachment  has an attachment                         before: after:   YYYY-MM-DD dates                         │
+│  "exact phrase"  phrase                                    -word            not                                      │
+│  word OR word    either word                               larger:2m        size over 2 MB                           │
+│                                                                                                                      │
+│  Terms the local index cannot run are listed above, so results are never silently wider than asked.                  │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+ 2 results                                                                                       ✓ synced via JMAP push 
+ Enter open  Up/Down results  Tab results or query  ^r server  ^s save search  Esc close

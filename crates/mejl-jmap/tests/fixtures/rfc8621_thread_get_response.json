@@ -1,0 +1,15 @@
+[ "Thread/get", {
+  "accountId": "acme",
+  "state": "f6a7e214",
+  "list": [
+    {
+      "id": "f123u4",
+      "emailIds": [ "eaa623", "f782cbb" ]
+    },
+    {
+      "id": "f41u44",
+      "emailIds": [ "82cf7bb" ]
+    }
+  ],
+  "notFound": []
+}, "#1" ]

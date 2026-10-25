@@ -1,0 +1,28 @@
+---
+source: crates/mejl-ui/tests/screens.rs
+expression: hs.text()
+---
+ mejl   Inbox ▾  12 unread                                               ? help 
+┌─ Inbox ──────────────────────────────────────────────────────────────────────┐
+│ Today                                                                        ┃
+│ ◦   Juniper Tran (3)     Re: Garden club plot rota                     14:02 │
+│ ◦⚑  Owen Castillo        Draft budget for the hall repairs             13:47 │
+│ ◦ @ Larkspur Support (3) Re: Your order 48213 has shipped              09:12 │
+│     Lena Okafor (2)      Re: Thursday standup notes                    08:55 │
+│   @ Northgate Library    Your reservation is ready to collect          07:30 │
+│ Yesterday                                                                    │
+│     Priya Raman (5)      Re: Trip to the coast in November               Thu │
+│   @ Tessellate Weekly    Issue 112: tiling window managers               Thu │
+│  ⚑  Marco Bellini        Invoice 2026-118                                Thu │
+│ This week                                                                    │
+│     City Notices         Road closure on Elm Street, Oct 28              Wed │
+│     Dana Whitfield (2)   Re: Recipe for the plum cake                    Wed │
+│     Sam Ito              Photos from the climbing trip                   Tue │
+│   @ Kestrel Bank         Your October statement is ready                 Tue │
+│     Ravi Menon (4)       Re: Board game night                            Mon │
+│     Example Hosting      Renewal notice for example.org                  Mon │
+│ Earlier                                                                      │
+│     Grace Lindqvist      Quarterly newsletter draft                   Oct 17 │
+└──────────────────────────────────────────────────────────────────────────────┘
+ ✓ synced via JMAP push                                                1 of 214 
+ j/k move  o open  y archive  d trash  r reply  / search  : cmds  g go  ? help

@@ -1,0 +1,20 @@
+---
+source: crates/mejl-sieve/tests/render_golden.rs
+expression: block.text
+---
+# >>> mejl managed block v1 (do not edit by hand) >>>
+# mejl:rule id=r_esc name="Quote \" and backslash \\ and ✓ ünïcødé" enabled=1
+if allof (header :is "subject" "say \"hi\" \\o/",
+          header :matches "subject" "50% off\\* now\\? \\\\ok*",
+          header :matches "subject" "*\\*",
+          header :matches "subject" "literal \\* star and ? any",
+          header :contains "X-Unicode-Free" "日本語 – émoji 📬",
+          header :contains "subject" "keep; discard; require \"x\"; } # stop;") {
+  fileinto :mailboxid "M_q-1" "INBOX.Quotes \"and\" \\slashes.Ünder";
+}
+# mejl:rule id=r_esc_off name="Quote \" and backslash \\ and ✓ ünïcødé" enabled=0
+if false # allof (header :is "subject" "say \"hi\" \\o/", header :matches "subject" "50% off\\* now\\? \\\\ok*", header :matches "subject" "*\\*", header :matches "subject" "literal \\* star and ? any", header :contains "X-Unicode-Free" "日本語 – émoji 📬", header :contains "subject" "keep; discard; require \"x\"; } # stop;")
+{
+  fileinto :mailboxid "M_q-1" "INBOX.Quotes \"and\" \\slashes.Ünder";
+}
+# <<< mejl managed block v1 sha256=250b2dcc0edadafc4e05ec5c660d0a758216422476d1ac94aff6beee6dbc2321 <<<

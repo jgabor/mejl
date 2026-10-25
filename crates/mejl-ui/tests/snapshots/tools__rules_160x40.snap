@@ -1,0 +1,44 @@
+---
+source: crates/mejl-ui/tests/tools.rs
+expression: hs.text()
+---
+ mejl   mira@example.org   Rules (Sieve)                                                                                 mejl block v2   last copied v1, Oct 20 
+┌─ Rules ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ! Paste required. Fastmail has no public API for rules or Sieve, so mejl cannot write or read your server script.                                            │
+│  The mejl block changed since you last copied it (v1, Oct 20, 3 changes). Press P to copy it and paste it in Settings > Filters & Rules.                     │
+├─ mejl rules (4) ──────────────────────┬─ Edit rule ──────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                       │ Name     Receipts to folder                                                                                          │
+│  ✓ Newsletters                        │ State    ✓ enabled                                                                                                   │
+│▸ ✓ Receipts to folder             *   │ When     any of these match                                                                                          │
+│  ✓ Garden club label              *   │            From domain is shop.example.com                                                                           │
+│  ✗ Old promo                    off   │            Subject contains receipt                                                                                  │
+│                                       │            + add condition   from, to, subject, header, list-id, delivered-to, size                                  │
+│  * changed since last copy            │ Then     Move to Receipts                                                                                            │
+│  n new  J/K order  Space on/off       │          Mark read                                                                                                   │
+│                                       │          + add action   move to, label, mark read, pin, trash                                                        │
+├─ Fastmail UI rules ───────────────────┤ Stop     off                                                                                                         │
+│  Not readable by mejl: there is no    │ Checks   ✓ parses   ✓ only allowed extensions   ✓ no keep   ✓ no discard                                             │
+│  public rules API. Edit them in       │                                                                                                                      │
+│  Fastmail: Settings > Filters & Rules ├─ Sieve preview, read-only ── 21 lines ─────────────────────┬─ Dry run ───────────────────────────────────────────────┤
+│                                       │ # >>> mejl managed block v1 (do not edit by hand) >>>      │ Receipts to folder against 249 cached messages          │
+├─ Where the block runs ────────────────┤ # mejl:rule id=r_18aa name="Newsletters" enabled=1         │ local mejl matcher, newest first                        │
+│  require line           generated     │ if address :domain :is "from" "news.example.net" {         │ 3 would match   1 already in place                      │
+│  your code (top)        custom        │   fileinto :mailboxid "mb-newsletters" "INBOX.Newsletters⋯ │                                                         │
+│  blocked senders        generated     │ }                                                          │ 09:12  Larkspur Support Re: Your order 48⋯ -> Receipts  │
+│  masked email           generated     │▸# mejl:rule id=r_2c41 name="Receipts to folder" enabled=1  │ Tue    Larkspur Outfitt⋯Re: Your order 48⋯ -> Receipts  │
+│  spam, address rules    generated     │▸if anyof (address :domain :is "from" "shop.example.com",   │ Oct 8  Larkspur Outfitt⋯Receipt for order⋯ -> Receipts  │
+│▸ mejl block             custom        │▸          header :contains "subject" "receipt") {          │                                                         │
+│  Fastmail UI rules      generated     │▸  addflag "\\Seen";                                        │ a  apply to these 3 now (undo with z)                   │
+│  your code (bottom)     custom        │▸  fileinto :mailboxid "mb-receipts" "INBOX.Receipts";      │                                                         │
+│  Paste below spam protection.         │▸}                                                          │ Simulates the mejl block only, using stored headers.    │
+│  Order from samples, unconfirmed.     │ # mejl:rule id=r_5d07 name="Garden club label" enabled=1   │ Fastmail's generated blocks (spam, masked email, UI     │
+├─ Paste status ────────────────────────┤ if header :contains "list-id" "garden-club.example.org" {  │ rules) are not simulated.                               │
+│  local block   v2, 3 changes          │   fileinto :copy :mailboxid "mb-garden" "INBOX.Projects.G⋯ │                                                         │
+│  last copied   v1, Oct 20             │ }                                                          │                                                         │
+│  on Fastmail   unknown                │ # mejl:rule id=r_77e2 name="Old promo" enabled=0           │                                                         │
+│                                       │ if false # address :domain :is "from" "promo.example.com"  │                                                         │
+│  v  paste the section back to check   │ {                                                          │                                                         │
+│  P  copy block for Fastmail           │   fileinto :specialuse "\\Trash" "INBOX.Trash";            │                                                         │
+└───────────────────────────────────────┴────────────────────────────────────────────────────────────┴─────────────────────────────────────────────────────────┘
+ Rules saved locally.  3 changes not on Fastmail yet.                                                                                    ✓ synced via JMAP push 
+ n new  Enter edit  Space on/off  J/K reorder  t dry run  a apply to existing  P copy block for Fastmail  v paste back to check  Esc back  ? help

@@ -1,0 +1,7 @@
+["MaskedEmail/set", {
+  "accountId": "u1234abcd",
+  "destroyed": null,
+  "notDestroyed": {
+    "masked-123456": { "type": "forbidden", "subType": "addressInUse" }
+  }
+}, "d0"]

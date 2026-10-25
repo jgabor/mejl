@@ -1,0 +1,28 @@
+---
+source: crates/mejl-ui/tests/screens.rs
+expression: hs.text()
+---
+ mejl   Inbox > Re: Your order 48213 has shipped                       3 of 214 
+┌─ Re: Your order 48213 has shipped ───────────────────────────────────────────┐
+│ 3 messages, 1 attachment   label: Receipts                                   │
+│ ▸ Larkspur Outfitters  Oct 20 16:05  Thanks for your order. Order 48213 is ⋯ │
+│ ▸ Mira Holt (you)      Oct 21 08:31  Hi, could you ship to my work address ⋯ │
+│ ▾ Larkspur Support <help@shop.example.com>                  Fri 23 Oct 09:12 │
+│   to kettle.fern4821@example.org  @ masked: Larkspur shop                    │
+│   remote images off, 2 trackers blocked                    O open in browser │
+│                                                                              │
+│      ORDER UPDATE                                                            │
+│                                                                              │
+│      Hi Mira,                                                                │
+│                                                                              │
+│      Good news: we changed the delivery address and your order has shipped.  │
+│      You can follow the parcel with the link below.                          │
+│                                                                              │
+│      [ Track your parcel ][1]                                                │
+│                                                                              │
+│      ───────────────────────────┬───┬─────                                   │
+│      Item                       │Qty│Price                                   │
+│      ───────────────────────────┼───┼─────                                   │
+└──────────────────────────────────────────────────────────────────────────────┘
+ ✓ synced via JMAP push                                                3 of 214 
+ j/k conv  n/p msg  " quotes  y archive  d trash  r reply  u back  ? help

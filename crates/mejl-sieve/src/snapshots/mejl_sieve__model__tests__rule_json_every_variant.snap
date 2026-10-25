@@ -1,0 +1,109 @@
+---
+source: crates/mejl-sieve/src/model.rs
+expression: json
+---
+{
+  "id": "r_all",
+  "name": "Every variant",
+  "enabled": false,
+  "match_mode": "any",
+  "conditions": [
+    {
+      "negate": false,
+      "field": "address",
+      "header": "from",
+      "part": "all",
+      "op": "is",
+      "value": "a@example.com"
+    },
+    {
+      "negate": false,
+      "field": "address",
+      "header": "to",
+      "part": "localpart",
+      "op": "starts_with",
+      "value": "billing"
+    },
+    {
+      "negate": false,
+      "field": "address",
+      "header": "cc",
+      "part": "domain",
+      "op": "ends_with",
+      "value": ".example.org"
+    },
+    {
+      "negate": true,
+      "field": "address",
+      "header": "to_or_cc",
+      "part": "domain",
+      "op": "matches",
+      "value": "*.example.net"
+    },
+    {
+      "negate": false,
+      "field": "subject",
+      "op": "contains",
+      "value": "receipt"
+    },
+    {
+      "negate": false,
+      "field": "list_id",
+      "op": "contains",
+      "value": "<garden-club.example.org>"
+    },
+    {
+      "negate": false,
+      "field": "header",
+      "name": "X-Spam-score",
+      "op": "is",
+      "value": "0"
+    },
+    {
+      "negate": false,
+      "field": "delivered_to",
+      "op": "is",
+      "value": "shop.k3x9@example.com"
+    },
+    {
+      "negate": false,
+      "field": "size_over",
+      "bytes": 1048576
+    },
+    {
+      "negate": false,
+      "field": "size_under",
+      "bytes": 18446744073709551615
+    }
+  ],
+  "actions": [
+    {
+      "action": "move_to",
+      "mailbox": {
+        "id": "M7d1e",
+        "path": [
+          "Receipts"
+        ]
+      }
+    },
+    {
+      "action": "add_label",
+      "mailbox": {
+        "id": "M7d1e",
+        "path": [
+          "Receipts"
+        ]
+      }
+    },
+    {
+      "action": "mark_read"
+    },
+    {
+      "action": "pin"
+    },
+    {
+      "action": "move_to_trash"
+    }
+  ],
+  "stop": true
+}

@@ -1,0 +1,5 @@
+{
+  "type": "urn:ietf:params:jmap:error:unknownCapability",
+  "status": 400,
+  "detail": "The Request object used capability 'https://example.com/apis/foobar', which is not supported by this server."
+}

@@ -1,0 +1,18 @@
+---
+source: crates/mejl-sieve/tests/render_golden.rs
+expression: block.text
+---
+# >>> mejl managed block v1 (do not edit by hand) >>>
+# mejl:rule id=r_act name="Every action in user order" enabled=1
+if address :domain :is "from" "example.com" {
+  addflag "\\Flagged";
+  addflag "\\Seen";
+  fileinto :copy :mailboxid "Ml1" "INBOX.Label";
+  fileinto :mailboxid "Mw1" "INBOX.Work.Clients";
+  fileinto :specialuse "\\Trash" "INBOX.Trash";
+}
+# mejl:rule id=r_inbox name="Back to the Inbox" enabled=1
+if true {
+  fileinto :mailboxid "Minbox" "INBOX";
+}
+# <<< mejl managed block v1 sha256=4327ddcaca65697bf7ddb9f61e8e8a9841d70812fc08fc10e759af52b3864824 <<<

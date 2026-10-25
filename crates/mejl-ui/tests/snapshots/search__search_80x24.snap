@@ -1,0 +1,28 @@
+---
+source: crates/mejl-ui/tests/search.rs
+expression: hs.text()
+---
+ mejl   Search                                                    all mailboxes 
+┌─ Search ─────────────────────────────────────────────────────────────────────┐
+│ / from:larkspur has:attachment deliveredto:shop       Fastmail search syntax │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Filters  [from: larkspur]  [has: attachment]  [deliveredto: shop]            │
+│ Local    skipped deliveredto:shop (not in the local index); the server sear⋯ │
+│ JMAP     Email/query  filter: {"operator":"AND",                             │
+│                       "conditions":[{"from":"larkspur"},{"hasAttachment":tr⋯ │
+│                       sort: receivedAt descending   collapseThreads: true    │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Results  1 local, then 1 more from the server           Enter open as a list │
+│                                                                              │
+│  source  date        from                  subject                           │
+│▸ local   09:12       Larkspur Support      Re: Your order 48213 has shipped⋯ │
+│  server  Sep 2       Owen Castillo         Gutter quote  Quote for the gutt⋯ │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+ 2 results                                                                      
+ Enter open  Up/Down results  Tab results or query  ^s save search  Esc close

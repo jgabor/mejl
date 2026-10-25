@@ -1,0 +1,14 @@
+{
+  "capabilities": {
+    "urn:ietf:params:jmap:core": { "maxObjectsInGet": 4096, "maxCallsInRequest": 50 },
+    "urn:ietf:params:jmap:mail": {},
+    "urn:ietf:params:jmap:submission": {},
+    "https://www.fastmail.com/dev/maskedemail": {}
+  },
+  "primaryAccounts": {
+    "urn:ietf:params:jmap:mail": "u1234abcd",
+    "https://www.fastmail.com/dev/maskedemail": "u1234abcd"
+  },
+  "apiUrl": "https://jmap.example.com/jmap/api/",
+  "eventSourceUrl": "https://jmap.example.com/jmap/event/?types={types}&closeafter={closeafter}&ping={ping}"
+}

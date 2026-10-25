@@ -1,0 +1,9 @@
+[ "Email/changes", {
+  "accountId": "ue150411c",
+  "oldState": "780823",
+  "newState": "780839",
+  "hasMoreChanges": true,
+  "created": [ "Mc5c24c2b8be2", "Mfb1f0c6dd4ed" ],
+  "updated": [ "Maba61f7f1fe0" ],
+  "destroyed": []
+}, "0" ]

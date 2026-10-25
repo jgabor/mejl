@@ -1,0 +1,11 @@
+---
+source: crates/mejl-render/tests/render.rs
+expression: dump(&body)
+---
+width 40 | source Html | remote images 0 | trackers 0 | truncated false | fallback false
+--- lines
+  0 |{h:Big }{h/:news}
+  1 |
+  2 |{*:bold} {~:gone} {c:x = 1}
+--- folds
+--- links

@@ -1,0 +1,28 @@
+---
+source: crates/mejl-ui/tests/tools.rs
+expression: hs.text()
+---
+ mejl   Masked Email                                   mask domain: example.org 
+┌─ Masked Email  14 addresses ─────────────────────────────────────────────────┐
+│ 9 enabled   2 disabled   1 pending   2 deleted        1 silent for 6+ months │
+│ Show 1 ✓ enabled  2 ✓ disabled  3 ✓ pending  4 ✓ deleted     5 silent: any   │
+│ / search address, description or site                                        │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ state      address                       description            last   mail  │
+│▸✓ enabled  kettle.fern4821@example.org   Larkspur shop         09:12     23  │
+│ ✓ enabled  bright.otter2207@example.org  Northgate Library     07:30     41  │
+│ ✓ enabled  sunny.flax1189@example.org    Tessellate Weekly       Thu    112  │
+│ ✗ disabled quiet.heron7731@example.org   Promo contest           Wed    312  │
+│ ✓ enabled  maple.drift5513@example.org   Kestrel Bank            Tue     64  │
+│ ✓ enabled  amber.loom3390@example.org    Harbor Dental        Oct 16      9  │
+│ ✓ enabled  minty.cove3317@example.org    Wren Analytics       Oct 14     30  │
+├─ kettle.fern4821@example.org ────────────────────────────────────────────────┤
+│  name      Larkspur shop    ✓ enabled                                        │
+│  site      https://shop.example.com    created 2025-03-14 by mejl    last m⋯ │
+│  mail      23 messages in the local index, 0 in Spam                         │
+│  senders   help@shop.example.com (1), orders@shop.example.com (1)            │
+│  check     ✓ every sender matches the site                                   │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+ 14 of 14 shown                                                                 
+ j/k move  / search  1-4 state filter  n new  e enable  x disable  ? help

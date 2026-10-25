@@ -1,0 +1,40 @@
+---
+source: crates/mejl-ui/tests/screens.rs
+expression: hs.text()
+---
+ mejl   mira@example.org   Inbox ▾  12 unread                                                  fastmail preset   ? help 
+┌─ Inbox  12 unread ──────────────────────────────────────┬─ Re: Garden club plot rota ────────────────────────────────┐
+│ Today             ┌─ Keys: reader ───────────────────────────────────────────────────────────────┐                   │
+│ ◦   Juniper Tran (│ / quot                                                                       │                   │
+│ ◦⚑  Owen Castillo ├──────────────────────────────────────────────────────────────────────────────┤ rota for Novembe⋯ │
+│ ◦ @ Larkspur Suppo│ Read and reply                                                               │annot do the 7th,⋯ │
+│     Lena Okafor (2│ "              Show or hide quoted text                        toggle-quotes │om>          14:02 │
+│   @ Northgate Libr│                                                                              │                   │
+│ Yesterday         │ Hold Shift to select text with the mouse in most terminals.                  │                   │
+│     Priya Raman (5│                                                                              │u take the 14th    │
+│   @ Tessellate Wee│                                                                              │ we are set.       │
+│  ⚑  Marco Bellini │                                                                              │                   │
+│ This week         │                                                                              │ whoever is on     │
+│     City Notices  │                                                                              │ leave the shed    │
+│     Dana Whitfield│                                                                              │                   │
+│     Sam Ito       │                                                                              │                   │
+│   @ Kestrel Bank  │                                                                              │                   │
+│     Ravi Menon (4)│                                                                              │                   │
+│     Example Hostin│                                                                              │                   │
+│ Earlier           │                                                                              │                   │
+│     Grace Lindqvis│                                                                              │                   │
+│   @ Harbor Dental │                                                                              │                   │
+│     Felix Moreau (│                                                                              │                   │
+│   @ Wren Analytics│                                                                              │                   │
+│     Juniper Tran  │                                                                              │                   │
+│     Noor Haddad (2│                                                                              │and all            │
+│   @ Larkspur Outfi│                                                                              │                   │
+│     Theo Park     │                                                                              │                   │
+│   @ Maple Street C│                                                                              │                   │
+│     Ines Duarte (3│                                                                              │                   │
+│     Owen Castillo │                                                                              │                   │
+│     Bea Kowalski (│                                                                              │                   │
+│   @ Calder Insuran└──────────────────────────────────────────────────────────────────────────────┘                   │
+└─────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────┘
+                                                                                       ✓ synced via JMAP push  14:02:31 
+ type to filter  Up/Down scroll  Esc close

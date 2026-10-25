@@ -1,0 +1,32 @@
+---
+source: crates/mejl-sieve/tests/render_golden.rs
+expression: block.text
+---
+# >>> mejl managed block v1 (do not edit by hand) >>>
+# mejl:rule id=r_on name="No conditions" enabled=1
+if true {
+  addflag "\\Seen";
+}
+# mejl:rule id=r_off name="No conditions, disabled" enabled=0
+if false # true
+{
+  addflag "\\Seen";
+}
+# mejl:rule id=r_multi name="All of three, disabled" enabled=0
+if false # allof (address :domain :is "from" "example.net", not size :over 1K, header :contains "subject" "invoice")
+{
+  fileinto :specialuse "\\Trash" "INBOX.Trash";
+  stop;
+}
+# mejl:rule id=r_multi_on name="All of three, stops" enabled=1
+if allof (address :domain :is "from" "example.net",
+          not size :over 1K,
+          header :contains "subject" "invoice") {
+  fileinto :specialuse "\\Trash" "INBOX.Trash";
+  stop;
+}
+# mejl:rule id=r_stop name="Stop only" enabled=1
+if address :domain :is "from" "example.org" {
+  stop;
+}
+# <<< mejl managed block v1 sha256=0cd06ff86f1613765afb47913d70afa58f9a0daddde3c60bd22e92d27646a075 <<<

@@ -1,0 +1,17 @@
+[ "SearchSnippet/get", {
+  "accountId": "ue150411c",
+  "list": [{
+    "emailId": "M44200ec123de277c0c1ce69c",
+    "subject": null,
+    "preview": null
+  }, {
+    "emailId": "M7bcbcb0b58d7729686e83d99",
+    "subject": "The <mark>Foo</mark>sball competition",
+    "preview": "...year the <mark>foo</mark>sball competition will be held in the Stadium de ..."
+  }, {
+    "emailId": "M28d12783a0969584b6deaac0",
+    "subject": null,
+    "preview": "...the <mark>Foo</mark>/bar method results often returns &lt;1 widget rather than the complete..."
+  }],
+  "notFound": null
+}, "tag-0" ]

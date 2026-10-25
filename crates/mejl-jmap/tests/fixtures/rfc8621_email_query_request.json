@@ -1,0 +1,32 @@
+[ "Email/query", {
+  "accountId": "A1",
+  "filter": {
+    "operator": "AND",
+    "conditions": [
+      { "inMailbox": "id_of_inbox" },
+      {
+        "operator": "OR",
+        "conditions": [
+          { "hasKeyword": "music" },
+          { "hasKeyword": "video" }
+        ]
+      },
+      {
+        "operator": "NOT",
+        "conditions": [
+          { "from": "spammer@example.net" },
+          { "header": [ "List-Id" ] }
+        ]
+      },
+      { "after": "2013-10-01T00:00:00Z", "minSize": 100, "hasAttachment": false }
+    ]
+  },
+  "sort": [
+    { "property": "receivedAt", "isAscending": false },
+    { "property": "someInThreadHaveKeyword", "keyword": "$flagged", "isAscending": false }
+  ],
+  "collapseThreads": true,
+  "position": 0,
+  "limit": 10,
+  "calculateTotal": true
+}, "t0" ]

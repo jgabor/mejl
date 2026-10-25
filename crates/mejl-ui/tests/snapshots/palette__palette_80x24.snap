@@ -1,0 +1,28 @@
+---
+source: crates/mejl-ui/tests/palette.rs
+expression: hs.text()
+---
+ mejl   Inbox ▾  12 unread                                               ? help 
+┌─ Inbox ──────────────────────────────────────────────────────────────────────┐
+│ Today                                                                        ┃
+│ ◦   Juniper Tran (3)     Re: Garden club plot rota                     14:02 │
+│┌─ Commands ────────────────────────────────────────────────── : or Ctrl-k ──┐│
+││ > type to filter                                                           ││
+│├────────────────────────────────────────────────────────────────────────────┤│
+││ ▸ Show the keys for this screen               ?         app                ││
+││   Search mail                                 /         app                ││
+││   Go back one level: close an overlay, leave⋯ u         app                ││
+││   Go back, or quit at the top level           q         app                ││
+││   Quit at once                                Q         app                ││
+││   Suspend mejl; the shell's fg brings it back ^z        app                ││
+││   Undo the last change                        z         app                ││
+││   Redo the last undone change                 ^y        app                ││
+││   Write a new message                         c         read               ││
+││                                                                            ││
+│├────────────────────────────────────────────────────────────────────────────┤│
+││ Each row shows its key, so the palette teaches the shortcuts.              ││
+││ Also searches: mailboxes, saved searches, contacts, rules, masked address⋯ ││
+│└────────────────────────────────────────────────────────────────────────────┘│
+└──────────────────────────────────────────────────────────────────────────────┘
+ 119 commands                                                          1 of 214 
+ Up/Down move  Enter run  Tab complete  ^n/^p next/prev  Esc close

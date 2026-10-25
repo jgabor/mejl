@@ -1,0 +1,68 @@
+---
+source: crates/mejl-render/tests/render.rs
+expression: dump(&body)
+---
+width 30 | source Html | remote images 1 | trackers 1 | truncated false | fallback false
+--- lines
+  0 |{.:[image: Larkspur Outfitters]}
+  1 |
+  2 |{h:Order update}
+  3 |
+  4 |Hi Mira,
+  5 |
+  6 |Good news: we changed the
+  7 |delivery address and your
+  8 |order has shipped. You can
+  9 |follow the parcel with the
+ 10 |link below.
+ 11 |
+ 12 |{l1:[ Track your parcel ]}{m1:[1]}
+ 13 |
+ 14 |{r:─────────────────────┬───┬────}
+ 15 |Item                 {r:│}Qty{r:│}Pric
+ 16 |                     {r:│}   {r:│}e
+ 17 |{r:─────────────────────┼───┼────}
+ 18 |Merino hiking socks, {r:│}1  {r:│}18.0
+ 19 |2-pack               {r:│}   {r:│}0
+ 20 |{r:─────────────────────┼───┼────}
+ 21 |Trail bottle, 750 ml {r:│}2  {r:│}24.0
+ 22 |                     {r:│}   {r:│}0
+ 23 |{r:─────────────────────┼───┼────}
+ 24 |Delivery             {r:│}   {r:│}0.00
+ 25 |{r:─────────────────────┼───┼────}
+ 26 |{*:Total}                {r:│}   {r:│}{*:42.0}
+ 27 |                     {r:│}   {r:│}{*:0}
+ 28 |{r:─────────────────────┴───┴────}
+ 29 |
+ 30 |Questions? Reply to this email
+ 31 |or visit our {l2:help centre}{m2:[2]}.
+ 32 |
+ 33 |{l3:Manage your email}
+ 34 |{l3:preferences}{m3:[3]}.
+ 35 |
+ 36 |On Wed, Oct 21, 2026 at 8:31
+ 37 |AM Mira Holt
+ 38 |<mira@example.org> wrote:
+ 39 |
+ 40 |{q1:> Hi,}
+ 41 |{q1:> could you ship to my work}
+ 42 |{q1:> address instead? It is 4}
+ 43 |{q1:> Quay Road, Harbourside.}
+ 44 |{q1:> The office is open from 8 to}
+ 45 |{q1:> 5 on weekdays, and the front}
+ 46 |{q1:> desk can sign for parcels.}
+ 47 |{q1:> Thanks,}
+ 48 |{q1:> Mira}
+ 49 |
+ 50 |{m1:[1] }{l1:https://shop.example.com/t}
+ 51 |    {l1:rack/48213}
+ 52 |{m2:[2] }{l2:https://shop.example.com/h}
+ 53 |    {l2:elp}
+ 54 |{m3:[3] }{l3:https://shop.example.com/p}
+ 55 |    {l3:references}
+--- folds
+Quote lines 36..49: 9 quoted lines from Mira Holt, Oct 21
+--- links
+[1] https://shop.example.com/track/48213 | [ Track your parcel ]
+[2] https://shop.example.com/help | help centre
+[3] https://shop.example.com/preferences | Manage your email preferences

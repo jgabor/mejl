@@ -1,0 +1,28 @@
+---
+source: crates/mejl-ui/tests/tools.rs
+expression: hs.text()
+---
+ mejl   Settings                                     written to the config file 
+┌─ Settings ───────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│▸ Theme           terminal            terminal uses your terminal's colours;⋯ │
+│  Keys            fastmail            fastmail follows Fastmail's web shortc⋯ │
+│  List density    comfortable         compact drops date headings; relaxed s⋯ │
+│  Prefer HTML     off                 show the HTML part when a message has ⋯ │
+│  Undo send       10 s                how long a sent message waits so z can⋯ │
+│  Remote images   off                 whether the browser view may load remo⋯ │
+│  Mark read       on open             how long a conversation is open before⋯ │
+│  Archive reads   off                 archiving a conversation also marks it⋯ │
+│                                                                              │
+│  Layout          auto   (set in the config file)                             │
+│  Accessible mode off   (set in the config file)                              │
+│  Hint bar        on   (set in the config file)                               │
+│                                                                              │
+│  Changes are written to the config file and apply at once.                   │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+ ✓ synced via JMAP push                                                         
+ j/k move  Enter change  Left/Right previous/next  Esc back  ? help

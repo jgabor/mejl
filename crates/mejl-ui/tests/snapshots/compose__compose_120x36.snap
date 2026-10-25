@@ -1,0 +1,40 @@
+---
+source: crates/mejl-ui/tests/compose.rs
+expression: hs.text()
+---
+ mejl   mira@example.org   New message                                                                  draft in Drafts 
+┌─ New message ────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ From     Mira Holt <mira@example.org> ▾                                                                              │
+│ To       bookings@cabins.example.net                                                                                 │
+│ Cc       add people                                                                                                  │
+│ Subject  Booking for 14 to 16 November                                                                               │
+├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                                                      │
+│   Hi,                                                                                                                │
+│                                                                                                                      │
+│   We would like to book the lakeside cabin from Friday 14 November to                                                │
+│   Sunday 16 November, for two adults.                                                                                │
+│                                                                                                                      │
+│   A few questions:                                                                                                   │
+│                                                                                                                      │
+│   - Is late check-in after 21:00 possible?                                                                           │
+│   - Can we bring a small dog?                                                                                        │
+│                                                                                                                      │
+│   The floor plan you sent last year is attached. We would like the same                                              │
+│   layout if it is free.                                                                                              │
+│                                                                                                                      │
+│   Thanks,                                                                                                            │
+│   Mira                                                                                                               │
+│                                                                                                                      │
+│   --                                                                                                                 │
+│   Mira                                                                                                               │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Attach   floorplan-2025.pdf  212 KB    Del remove   ^o a add a file                                                  │
+│ Format   plain text, sent as text/plain                                                                              │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+ ✓ Draft saved 3 s ago  (Drafts)                                                      58 words   ✓ synced via JMAP push 
+ Tab next field  ^o s send  ^s save  ^o a attach  ^o m new mask  ^o e $EDITOR  ^o d discard  Esc leave field

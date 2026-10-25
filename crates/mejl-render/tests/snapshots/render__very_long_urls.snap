@@ -1,0 +1,37 @@
+---
+source: crates/mejl-render/tests/render.rs
+expression: dump(&body)
+---
+width 40 | source Plain | remote images 0 | trackers 0 | truncated false | fallback false
+--- lines
+  0 |Confirm here:
+  1 |{l1:https://click.example.com/ls/click?upn=a}
+  2 |{l1:B3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE}
+  3 |{l1:6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9}
+  4 |{l1:aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3d}
+  5 |{l1:E6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH}
+  6 |{l1:9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3}
+  7 |{l1:dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6g}
+  8 |{l1:H9aB3dE6gH9aB3dE6gH9aB3dE6gH9&data=xxxxx}
+  9 |{l1:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+ 10 |{l1:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+ 11 |{l1:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+ 12 |{l1:xxxxxxxxxxxxxxxxxxxxxxxxx}{m1:[1]}
+ 13 |Thanks.
+ 14 |
+ 15 |{m1:[1] }{l1:https://click.example.com/ls/click?u}
+ 16 |    {l1:pn=aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6}
+ 17 |    {l1:gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6}
+ 18 |    {l1:gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6}
+ 19 |    {l1:gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6}
+ 20 |    {l1:gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6}
+ 21 |    {l1:gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6}
+ 22 |    {l1:gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6}
+ 23 |    {l1:gH9aB3dE6gH9aB3dE6gH9&data=xxxxxxxxx}
+ 24 |    {l1:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+ 25 |    {l1:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+ 26 |    {l1:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+ 27 |    {l1:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+--- folds
+--- links
+[1] https://click.example.com/ls/click?upn=aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9&data=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx | https://click.example.com/ls/click?upn=aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9aB3dE6gH9&data=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

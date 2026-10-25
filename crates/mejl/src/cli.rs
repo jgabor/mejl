@@ -1,0 +1,1042 @@
+//! The command line.
+//!
+//! ```text
+//! mejl                  run the TUI for the selected account
+//! mejl --demo           run against a built-in fictional mailbox, no account
+//! mejl login            paste an API token, check it and store it
+//! mejl logout           forget the token and the local cache
+//! mejl doctor           print paths, config check, stores and terminal support
+//! mejl keys --check     check key overrides in the config
+//! ```
+//!
+//! Global options: `--config <path>`, `--account <name>`, `--log-level
+//! <level>`, `--version`, `--help`.
+//!
+//! Exit codes ([`exit`]): 0 success, 1 failure, 2 usage error, 3 config
+//! error, 4 not logged in or token refused, 5 the account is open in
+//! another mejl.
+
+use std::io::{self, BufRead, IsTerminal, Write};
+use std::path::PathBuf;
+use std::process::ExitCode;
+use std::sync::Arc;
+
+use clap::{Parser, Subcommand};
+use mejl_jmap::transport::Transport;
+use mejl_jmap::{Client, HttpTransport};
+
+use crate::config::{self, AccountConfig, Config, ConfigError, Loaded};
+use crate::demo::{DEMO_ACCOUNT, DemoBackend, DemoOptions};
+use crate::doctor::{self, DoctorInput};
+use crate::env::Env;
+use crate::keys;
+use crate::lock::{InstanceLock, LockError};
+use crate::login::{self, Capability, LoginError, TOKEN_SETTINGS_URL};
+use crate::paths::Paths;
+use crate::secrets::{KeyringStore, SecretError, SecretStore, resolve_token};
+use crate::terminal::probe;
+
+/// Exit codes.
+pub mod exit {
+    /// Success.
+    pub const OK: u8 = 0;
+    /// Any other failure.
+    pub const FAILURE: u8 = 1;
+    /// Bad command line (clap's own code).
+    pub const USAGE: u8 = 2;
+    /// The config file is invalid.
+    pub const CONFIG: u8 = 3;
+    /// No token, or the server refused it.
+    pub const AUTH: u8 = 4;
+    /// Another mejl has the account open.
+    pub const LOCKED: u8 = 5;
+}
+
+const EXIT_HELP: &str = "\
+Exit codes:
+  0  success
+  1  failure
+  2  usage error
+  3  config error
+  4  not logged in, or the token was refused
+  5  the account is open in another mejl
+
+Environment:
+  MEJL_TOKEN  API token to use instead of the keyring, for scripts
+  MEJL_LOG    log filter, such as debug or mejl=trace
+  NO_COLOR    turn colour off";
+
+/// mejl's arguments.
+#[derive(Debug, Clone, PartialEq, Eq, Parser)]
+#[command(
+    name = "mejl",
+    version,
+    about = "A fast, keyboard-first terminal email client for Fastmail",
+    after_help = EXIT_HELP,
+    args_conflicts_with_subcommands = true
+)]
+pub struct Cli {
+    /// Run against a built-in fictional mailbox. No account or network
+    /// needed.
+    #[arg(long)]
+    pub demo: bool,
+
+    /// Read this config file instead of the default one.
+    #[arg(long, global = true, value_name = "PATH")]
+    pub config: Option<PathBuf>,
+
+    /// Use this account from the config.
+    #[arg(long, global = true, value_name = "NAME")]
+    pub account: Option<String>,
+
+    /// Log level for the log file. Overrides MEJL_LOG.
+    #[arg(
+        long,
+        global = true,
+        value_name = "LEVEL",
+        value_parser = ["off", "error", "warn", "info", "debug", "trace"]
+    )]
+    pub log_level: Option<String>,
+
+    /// What to do. Without one, mejl starts.
+    #[command(subcommand)]
+    pub command: Option<Command>,
+}
+
+/// Subcommands.
+#[derive(Debug, Clone, PartialEq, Eq, Subcommand)]
+pub enum Command {
+    /// Paste an API token, check it with the server and store it in the
+    /// OS keyring.
+    Login,
+    /// Remove the stored token and the local cache. The outbox and drafts
+    /// are removed too after a confirmation.
+    Logout {
+        /// Also remove the outbox, drafts and rules without asking.
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Print paths, the config check, stores and terminal support. Never
+    /// prints a token.
+    Doctor {
+        /// Print a commented example config and exit.
+        #[arg(long)]
+        print_config: bool,
+        /// Do not query the terminal.
+        #[arg(long)]
+        no_probe: bool,
+    },
+    /// Key binding tools.
+    Keys {
+        /// Check the [keys] overrides in the config.
+        #[arg(long)]
+        check: bool,
+    },
+}
+
+/// A failure with its exit code. The message is for the user.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CliError {
+    /// The exit code.
+    pub code: u8,
+    /// What went wrong, in plain words.
+    pub message: String,
+}
+
+impl CliError {
+    /// A failure with a code.
+    pub fn new(code: u8, message: impl Into<String>) -> Self {
+        CliError {
+            code,
+            message: message.into(),
+        }
+    }
+}
+
+impl From<ConfigError> for CliError {
+    fn from(e: ConfigError) -> Self {
+        CliError::new(exit::CONFIG, e.to_string())
+    }
+}
+
+impl From<LockError> for CliError {
+    fn from(e: LockError) -> Self {
+        let code = match e {
+            LockError::Held { .. } => exit::LOCKED,
+            LockError::Io { .. } => exit::FAILURE,
+        };
+        CliError::new(code, e.to_string())
+    }
+}
+
+impl From<SecretError> for CliError {
+    fn from(e: SecretError) -> Self {
+        CliError::new(exit::AUTH, e.to_string())
+    }
+}
+
+impl From<LoginError> for CliError {
+    fn from(e: LoginError) -> Self {
+        let code = match e {
+            LoginError::Unauthorized | LoginError::NoMail(_) | LoginError::BadToken(_) => {
+                exit::AUTH
+            }
+            _ => exit::FAILURE,
+        };
+        CliError::new(code, e.to_string())
+    }
+}
+
+impl From<io::Error> for CliError {
+    fn from(e: io::Error) -> Self {
+        CliError::new(exit::FAILURE, e.to_string())
+    }
+}
+
+/// What a command needs from the outside world. Tests build one over
+/// temporary directories, an in-memory secret store and fake input.
+pub struct Context<'a> {
+    /// mejl's directories, with `--config` already applied.
+    pub paths: Paths,
+    /// The environment.
+    pub env: Env,
+    /// Where tokens are kept.
+    pub store: &'a dyn SecretStore,
+    /// The HTTP transport for login. `None` builds the real one when needed.
+    pub transport: Option<Arc<dyn Transport>>,
+    /// Standard input.
+    pub stdin: &'a mut dyn BufRead,
+    /// Whether standard input is a terminal (prompts in raw mode).
+    pub stdin_is_tty: bool,
+    /// Whether standard output is a terminal (the probe runs).
+    pub stdout_is_tty: bool,
+}
+
+impl Context<'_> {
+    fn transport(&self) -> Result<Arc<dyn Transport>, CliError> {
+        match &self.transport {
+            Some(t) => Ok(t.clone()),
+            None => HttpTransport::new()
+                .map(|t| Arc::new(t) as Arc<dyn Transport>)
+                .map_err(|e| CliError::new(exit::FAILURE, e.to_string())),
+        }
+    }
+}
+
+/// Runs mejl as the process: parses arguments, sets up logging, the panic
+/// hook and the real keyring, and maps the result to an exit code.
+pub fn main() -> ExitCode {
+    crate::tui::mark_start();
+    let cli = Cli::parse();
+    let env = Env::from_process();
+    let paths = match Paths::from_system() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("mejl: {e}");
+            return ExitCode::from(exit::FAILURE);
+        }
+    };
+    let paths = match &cli.config {
+        Some(file) => paths.with_config_file(file.clone()),
+        None => paths,
+    };
+    let _log = start_logging(&cli, &env, &paths);
+    crate::terminal::install_panic_hook();
+    let store = KeyringStore::new();
+    let stdin = io::stdin();
+    let stdin_is_tty = stdin.is_terminal();
+    let mut stdin = stdin.lock();
+    let mut ctx = Context {
+        paths,
+        env,
+        store: &store,
+        transport: None,
+        stdin: &mut stdin,
+        stdin_is_tty,
+        stdout_is_tty: io::stdout().is_terminal(),
+    };
+    let mut stdout = io::stdout();
+    let mut stderr = io::stderr();
+    match run(&cli, &mut ctx, &mut stdout, &mut stderr) {
+        Ok(()) => ExitCode::from(exit::OK),
+        Err(e) => {
+            tracing::error!(code = e.code, "{}", e.message);
+            let _ = writeln!(stderr, "mejl: {}", e.message);
+            ExitCode::from(e.code)
+        }
+    }
+}
+
+fn start_logging(cli: &Cli, env: &Env, paths: &Paths) -> Option<crate::logging::LogGuard> {
+    let filter = match crate::logging::build_filter(
+        cli.log_level.as_deref(),
+        env.get(crate::env::var::MEJL_LOG),
+    ) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("mejl: {e}; logging is off");
+            return None;
+        }
+    };
+    match crate::logging::init(&paths.log_dir(), filter) {
+        Ok(guard) => Some(guard),
+        Err(e) => {
+            eprintln!("mejl: {e}; logging is off");
+            None
+        }
+    }
+}
+
+/// Runs one command. `out` gets results, `err` gets warnings and prompts.
+pub fn run(
+    cli: &Cli,
+    ctx: &mut Context<'_>,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Result<(), CliError> {
+    tracing::info!(version = env!("CARGO_PKG_VERSION"), command = ?cli.command, demo = cli.demo, "mejl starting");
+    match &cli.command {
+        None if cli.demo => run_demo(ctx, out, err),
+        None => run_tui(cli, ctx, out, err),
+        Some(Command::Login) => run_login(cli, ctx, out, err),
+        Some(Command::Logout { yes }) => run_logout(cli, ctx, *yes, out, err),
+        Some(Command::Doctor {
+            print_config,
+            no_probe,
+        }) => run_doctor(cli, ctx, *print_config, *no_probe, out),
+        Some(Command::Keys { check }) => run_keys(ctx, *check, out, err),
+    }
+}
+
+/// Loads the config and prints its warnings.
+fn load_config(ctx: &Context<'_>, err: &mut dyn Write) -> Result<Loaded, CliError> {
+    let loaded = config::load(&ctx.paths.config_file)?;
+    for w in &loaded.warnings {
+        let _ = writeln!(
+            err,
+            "mejl: warning in {}: {w}",
+            ctx.paths.config_file.display()
+        );
+    }
+    Ok(loaded)
+}
+
+fn select_account(cli: &Cli, config: &Config) -> Result<AccountConfig, CliError> {
+    Ok(config.account(cli.account.as_deref())?)
+}
+
+/// The message for `mejl` and `mejl --demo` when there is no terminal to
+/// draw on.
+pub const NEEDS_TERMINAL: &str =
+    "mejl needs an interactive terminal; run it in one, or use a subcommand such as `mejl doctor`";
+
+fn require_terminal(ctx: &Context<'_>) -> Result<(), CliError> {
+    if ctx.stdin_is_tty && ctx.stdout_is_tty {
+        Ok(())
+    } else {
+        Err(CliError::new(exit::FAILURE, NEEDS_TERMINAL))
+    }
+}
+
+fn print_report(report: &crate::tui::Report, out: &mut dyn Write) -> Result<(), CliError> {
+    if let Some(note) = &report.note {
+        writeln!(out, "mejl stopped: {note}")?;
+    }
+    match report.held_sends {
+        0 => {}
+        1 => writeln!(
+            out,
+            "1 message is still queued to send. It goes out the next time mejl runs."
+        )?,
+        n => writeln!(
+            out,
+            "{n} messages are still queued to send. They go out the next time mejl runs."
+        )?,
+    }
+    Ok(())
+}
+
+fn run_tui(
+    cli: &Cli,
+    ctx: &mut Context<'_>,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Result<(), CliError> {
+    let loaded = load_config(ctx, err)?;
+    let account = select_account(cli, &loaded.config)?;
+    let dir = ctx.paths.ensure_account_dir(&account.name)?;
+    let _lock = InstanceLock::acquire(&dir)?;
+    let Some((token, source)) = resolve_token(&account, &ctx.env, ctx.store)? else {
+        return Err(CliError::new(
+            exit::AUTH,
+            format!(
+                "no API token for account {:?}. Run `mejl login{}`, or set MEJL_TOKEN",
+                account.name,
+                account_flag(cli)
+            ),
+        ));
+    };
+    // Checked after the setup, so a broken config or a missing token is
+    // reported the same way with or without a terminal.
+    require_terminal(ctx)?;
+    tracing::info!(account = %account.name, token = source.describe(), "starting");
+    let client = Client::new(ctx.transport()?, &account.session_url, token);
+    let caps_file = ctx.paths.caps_file();
+    let report = crate::tui::run_with_caps_cache(
+        crate::tui::Launch {
+            account: account.name.clone(),
+            store_dir: dir,
+            client,
+            engine: crate::tui::engine_config(&loaded.config),
+            config: loaded.config,
+            settings_path: ctx.paths.config_file.clone(),
+            env: ctx.env.clone(),
+        },
+        Some(&caps_file),
+    )?;
+    print_report(&report, out)
+}
+
+fn account_flag(cli: &Cli) -> String {
+    cli.account
+        .as_deref()
+        .map(|a| format!(" --account {a}"))
+        .unwrap_or_default()
+}
+
+/// Copies the user's config into the demo's directory, so the demo uses
+/// their theme and keys, and settings changed in the demo never touch the
+/// real file.
+fn demo_config(ctx: &Context<'_>, demo: &DemoBackend) -> Result<std::path::PathBuf, CliError> {
+    let paths = demo.paths();
+    crate::paths::create_private_dir(&paths.config_dir)?;
+    match std::fs::read_to_string(&ctx.paths.config_file) {
+        Ok(text) => std::fs::write(&paths.config_file, text)?,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e.into()),
+    }
+    Ok(paths.config_file)
+}
+
+fn run_demo(
+    ctx: &mut Context<'_>,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Result<(), CliError> {
+    let loaded = load_config(ctx, err)?;
+    require_terminal(ctx)?;
+    let demo = DemoBackend::start(DemoOptions::interactive())?;
+    let settings_path = demo_config(ctx, &demo)?;
+    let dir = demo.paths().ensure_account_dir(DEMO_ACCOUNT)?;
+    {
+        // Rules and saved searches are local only, so the demo brings its
+        // own, as in the mock-ups. The store closes before the engine opens
+        // it.
+        let mut store = mejl_store::Store::open(&dir, crate::tui::store_options(&loaded.config))
+            .map_err(|e| {
+                CliError::new(exit::FAILURE, format!("cannot open the demo store: {e}"))
+            })?;
+        crate::demo::seed_local(&mut store, demo.server(), jiff::Timestamp::now()).map_err(
+            |e| CliError::new(exit::FAILURE, format!("cannot fill the demo store: {e}")),
+        )?;
+    }
+    let transport: Arc<dyn Transport> =
+        Arc::new(HttpTransport::new().map_err(|e| CliError::new(exit::FAILURE, e.to_string()))?);
+    let client = Client::new(transport, demo.session_url(), demo.token());
+    let mut engine = crate::tui::engine_config(&loaded.config);
+    engine.push = true;
+    let report = crate::tui::run(crate::tui::Launch {
+        account: DEMO_ACCOUNT.to_owned(),
+        store_dir: dir,
+        client,
+        engine,
+        config: loaded.config,
+        settings_path,
+        env: ctx.env.clone(),
+    })?;
+    // The demo's stores are removed with its directory, so a held send
+    // never goes anywhere; say nothing about it.
+    let report = crate::tui::Report {
+        held_sends: 0,
+        ..report
+    };
+    print_report(&report, out)?;
+    drop(demo);
+    Ok(())
+}
+
+fn run_login(
+    cli: &Cli,
+    ctx: &mut Context<'_>,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Result<(), CliError> {
+    let loaded = load_config(ctx, err)?;
+    let account = select_account(cli, &loaded.config)?;
+    let scopes: Vec<&str> = Capability::ALL.iter().map(|c| c.scope_name()).collect();
+    let token = if ctx.stdin_is_tty {
+        writeln!(
+            err,
+            "Log in to account {:?} at {}.\nCreate an API token at {TOKEN_SETTINGS_URL}\nwith the scopes {}. The token is not shown as you paste it.",
+            account.name,
+            account.session_url,
+            scopes.join(", ")
+        )?;
+        login::prompt_token("API token: ")?
+    } else {
+        login::read_token_line(ctx.stdin)?
+    };
+    let token = token.ok_or_else(|| CliError::from(LoginError::Cancelled))?;
+    let token = login::checked(token)?;
+    let report = login::login_with_token(
+        ctx.transport()?,
+        &account.session_url,
+        &account.name,
+        token,
+        ctx.store,
+    )?;
+    for line in report.lines() {
+        writeln!(out, "{line}")?;
+    }
+    writeln!(
+        out,
+        "Token saved in the {} for account {:?}.",
+        ctx.store.describe(),
+        account.name
+    )?;
+    Ok(())
+}
+
+fn run_logout(
+    cli: &Cli,
+    ctx: &mut Context<'_>,
+    yes: bool,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Result<(), CliError> {
+    let loaded = load_config(ctx, err)?;
+    let account = select_account(cli, &loaded.config)?;
+    let dir = ctx.paths.account_dir(&account.name);
+    // Never pull files out from under a running mejl.
+    let lock = if dir.is_dir() {
+        Some(InstanceLock::acquire(&dir)?)
+    } else {
+        None
+    };
+    let had_token = ctx.store.delete(&account.name)?;
+    writeln!(
+        out,
+        "{}",
+        if had_token {
+            format!(
+                "Removed the token for {:?} from the {}.",
+                account.name,
+                ctx.store.describe()
+            )
+        } else {
+            format!("No stored token for {:?}.", account.name)
+        }
+    )?;
+    if lock.is_some() {
+        let removed = remove_store(&dir, mejl_store::CACHE_FILE)?;
+        if removed {
+            writeln!(out, "Removed the local cache (cache.db).")?;
+        }
+        let has_state = store_exists(&dir, mejl_store::STATE_FILE);
+        if has_state {
+            let confirmed = yes || (ctx.stdin_is_tty && confirm(ctx, err)?);
+            if confirmed {
+                remove_store(&dir, mejl_store::STATE_FILE)?;
+                writeln!(out, "Removed the outbox, drafts and rules (state.db).")?;
+            } else {
+                writeln!(
+                    out,
+                    "Kept state.db (outbox, drafts and rules) in {}. Run `mejl logout --yes` to remove it.",
+                    dir.display()
+                )?;
+            }
+        }
+    }
+    if ctx.env.non_empty(crate::env::var::MEJL_TOKEN).is_some() {
+        writeln!(err, "Note: MEJL_TOKEN is still set in this environment.")?;
+    }
+    drop(lock);
+    Ok(())
+}
+
+fn confirm(ctx: &mut Context<'_>, err: &mut dyn Write) -> Result<bool, CliError> {
+    write!(
+        err,
+        "Also remove the outbox, unsent drafts and rules for this account? [y/N] "
+    )?;
+    err.flush()?;
+    let mut answer = String::new();
+    ctx.stdin.read_line(&mut answer)?;
+    Ok(matches!(
+        answer.trim().to_ascii_lowercase().as_str(),
+        "y" | "yes"
+    ))
+}
+
+fn store_exists(dir: &std::path::Path, file: &str) -> bool {
+    dir.join(file).exists()
+}
+
+/// Removes a SQLite file and its write-ahead log files. Returns whether the
+/// main file existed.
+fn remove_store(dir: &std::path::Path, file: &str) -> io::Result<bool> {
+    let existed = dir.join(file).exists();
+    for suffix in ["", "-wal", "-shm", "-journal"] {
+        match std::fs::remove_file(dir.join(format!("{file}{suffix}"))) {
+            Ok(()) => {}
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(existed)
+}
+
+fn run_doctor(
+    cli: &Cli,
+    ctx: &mut Context<'_>,
+    print_config: bool,
+    no_probe: bool,
+    out: &mut dyn Write,
+) -> Result<(), CliError> {
+    if print_config {
+        write!(out, "{}", config::example_config())?;
+        return Ok(());
+    }
+    let loaded = config::load(&ctx.paths.config_file);
+    let probe_timeout =
+        (!no_probe && ctx.stdin_is_tty && ctx.stdout_is_tty).then_some(probe::DEFAULT_TIMEOUT);
+    let caps = probe::detect(&ctx.env, probe_timeout);
+    let input = DoctorInput {
+        paths: &ctx.paths,
+        env: &ctx.env,
+        config: loaded.as_ref(),
+        account: cli.account.as_deref(),
+        store: ctx.store,
+        caps: &caps,
+    };
+    let outcome = doctor::report(&input, out)?;
+    if outcome.config_errors {
+        return Err(CliError::new(
+            exit::CONFIG,
+            "the config file has errors (see above)",
+        ));
+    }
+    Ok(())
+}
+
+fn run_keys(
+    ctx: &mut Context<'_>,
+    check: bool,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Result<(), CliError> {
+    if !check {
+        writeln!(out, "Use `mejl keys --check` to check your key overrides.")?;
+        return Ok(());
+    }
+    let loaded = load_config(ctx, err)?;
+    let report = keys::check_keys_with(&loaded.config.keys, loaded.config.ui.preset);
+    for line in &report.lines {
+        writeln!(out, "{line}")?;
+    }
+    if report.has_errors {
+        return Err(CliError::new(exit::CONFIG, "the key overrides have errors"));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::secrets::MemoryStore;
+    use mejl_jmap::Secret;
+
+    fn parse(args: &[&str]) -> Result<Cli, clap::Error> {
+        Cli::try_parse_from(std::iter::once("mejl").chain(args.iter().copied()))
+    }
+
+    #[test]
+    fn parses_every_form() {
+        assert_eq!(parse(&[]).unwrap().command, None);
+        assert!(parse(&["--demo"]).unwrap().demo);
+        assert_eq!(parse(&["login"]).unwrap().command, Some(Command::Login));
+        assert_eq!(
+            parse(&["logout", "--yes"]).unwrap().command,
+            Some(Command::Logout { yes: true })
+        );
+        assert_eq!(
+            parse(&["doctor", "--print-config"]).unwrap().command,
+            Some(Command::Doctor {
+                print_config: true,
+                no_probe: false
+            })
+        );
+        assert_eq!(
+            parse(&["keys", "--check"]).unwrap().command,
+            Some(Command::Keys { check: true })
+        );
+        let cli = parse(&[
+            "--config",
+            "/x/c.toml",
+            "--account",
+            "work",
+            "--log-level",
+            "debug",
+        ])
+        .unwrap();
+        assert_eq!(cli.config, Some(PathBuf::from("/x/c.toml")));
+        assert_eq!(cli.account.as_deref(), Some("work"));
+        assert_eq!(cli.log_level.as_deref(), Some("debug"));
+        // Global options also work after the subcommand.
+        let cli = parse(&["doctor", "--account", "work"]).unwrap();
+        assert_eq!(cli.account.as_deref(), Some("work"));
+    }
+
+    #[test]
+    fn usage_errors() {
+        use clap::error::ErrorKind;
+        assert_eq!(
+            parse(&["--log-level", "loud"]).unwrap_err().kind(),
+            ErrorKind::InvalidValue
+        );
+        assert_eq!(
+            parse(&["frobnicate"]).unwrap_err().kind(),
+            ErrorKind::InvalidSubcommand
+        );
+        assert!(parse(&["--demo", "login"]).is_err());
+        assert_eq!(
+            parse(&["--version"]).unwrap_err().kind(),
+            ErrorKind::DisplayVersion
+        );
+        let help = parse(&["--help"]).unwrap_err().to_string();
+        assert!(help.contains("Exit codes"), "{help}");
+        assert!(help.contains("MEJL_TOKEN"));
+        assert_eq!(
+            parse(&["--log-level", "loud"]).unwrap_err().exit_code(),
+            i32::from(exit::USAGE)
+        );
+    }
+
+    #[test]
+    fn verify_cli_definition() {
+        use clap::CommandFactory;
+        Cli::command().debug_assert();
+    }
+
+    struct Harness {
+        _base: tempfile::TempDir,
+        paths: Paths,
+        store: MemoryStore,
+        env: Env,
+        transport: Option<Arc<dyn Transport>>,
+        stdin: io::Cursor<Vec<u8>>,
+        stdin_is_tty: bool,
+    }
+
+    impl Harness {
+        fn new() -> Self {
+            let base = tempfile::tempdir().unwrap();
+            let paths = Paths::under(base.path());
+            Harness {
+                _base: base,
+                paths,
+                store: MemoryStore::new(),
+                env: Env::default(),
+                transport: None,
+                stdin: io::Cursor::new(Vec::new()),
+                stdin_is_tty: false,
+            }
+        }
+
+        fn write_config(&self, text: &str) {
+            std::fs::create_dir_all(&self.paths.config_dir).unwrap();
+            std::fs::write(&self.paths.config_file, text).unwrap();
+        }
+
+        fn run(&mut self, args: &[&str]) -> (Result<(), CliError>, String, String) {
+            let cli = parse(args).unwrap();
+            let mut ctx = Context {
+                paths: self.paths.clone(),
+                env: self.env.clone(),
+                store: &self.store,
+                transport: self.transport.clone(),
+                stdin: &mut self.stdin,
+                stdin_is_tty: self.stdin_is_tty,
+                stdout_is_tty: false,
+            };
+            let mut out = Vec::new();
+            let mut err = Vec::new();
+            let result = run(&cli, &mut ctx, &mut out, &mut err);
+            (
+                result,
+                String::from_utf8(out).unwrap(),
+                String::from_utf8(err).unwrap(),
+            )
+        }
+    }
+
+    #[test]
+    fn run_without_token_says_how_to_log_in() {
+        let mut h = Harness::new();
+        let (result, _, _) = h.run(&["--account", "work"]);
+        let e = result.unwrap_err();
+        assert_eq!(e.code, exit::AUTH);
+        assert!(
+            e.message.contains("mejl login --account work"),
+            "{}",
+            e.message
+        );
+    }
+
+    #[test]
+    fn run_with_token_checks_setup_and_locks() {
+        let mut h = Harness::new();
+        h.store
+            .set("default", &Secret::new("fmu1-test-token-0001"))
+            .unwrap();
+        // Without a terminal the setup is checked, then mejl stops before
+        // it builds a client, so nothing is contacted.
+        let (result, out, _) = h.run(&[]);
+        let e = result.unwrap_err();
+        assert_eq!(e.code, exit::FAILURE);
+        assert_eq!(e.message, NEEDS_TERMINAL);
+        assert!(!out.contains("fmu1-test-token"));
+        // A second mejl on the same account is refused first.
+        let dir = h.paths.account_dir("default");
+        let _held = InstanceLock::acquire(&dir).unwrap();
+        let (result, _, _) = h.run(&[]);
+        assert_eq!(result.unwrap_err().code, exit::LOCKED);
+    }
+
+    #[test]
+    fn config_errors_exit_with_the_config_code() {
+        let mut h = Harness::new();
+        h.write_config("[ui]\nmouse = \"no\"\n");
+        let (result, _, _) = h.run(&[]);
+        let e = result.unwrap_err();
+        assert_eq!(e.code, exit::CONFIG);
+        assert!(e.message.contains("line 2"), "{}", e.message);
+        let (result, out, _) = h.run(&["doctor", "--no-probe"]);
+        assert_eq!(result.unwrap_err().code, exit::CONFIG);
+        assert!(out.contains("Paths"));
+    }
+
+    #[test]
+    fn config_warnings_go_to_stderr() {
+        let mut h = Harness::new();
+        h.write_config("[ui]\nmouce = true\n");
+        let (result, out, err) = h.run(&["keys", "--check"]);
+        result.unwrap();
+        assert!(err.contains("did you mean `ui.mouse`"), "{err}");
+        assert!(out.contains("no [keys] overrides"), "{out}");
+    }
+
+    #[test]
+    fn config_flag_is_honoured() {
+        let mut h = Harness::new();
+        let other = h._base.path().join("elsewhere.toml");
+        std::fs::write(&other, "[keys.list]\nj = \"next\"\n").unwrap();
+        h.paths = h.paths.clone().with_config_file(other);
+        let (result, out, _) = h.run(&["keys", "--check"]);
+        result.unwrap();
+        assert!(out.contains("1 key override in 1 context"), "{out}");
+    }
+
+    #[test]
+    fn doctor_print_config_and_report() {
+        let mut h = Harness::new();
+        let (result, out, _) = h.run(&["doctor", "--print-config"]);
+        result.unwrap();
+        assert_eq!(out, config::example_config());
+        h.env = Env::default().with(crate::env::var::MEJL_TOKEN, "fmu1-very-secret-doctor-0001");
+        let (result, out, _) = h.run(&["doctor"]);
+        result.unwrap();
+        assert!(out.contains("Terminal"));
+        assert!(!out.contains("very-secret"), "{out}");
+    }
+
+    #[test]
+    fn keys_without_check_explains() {
+        let mut h = Harness::new();
+        let (result, out, _) = h.run(&["keys"]);
+        result.unwrap();
+        assert!(out.contains("--check"));
+    }
+
+    fn serve() -> (
+        tokio::runtime::Runtime,
+        mejl_fake::HttpHandle,
+        mejl_fake::FakeServer,
+    ) {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .unwrap();
+        let server = mejl_fake::FakeServer::demo("2026-10-23T14:27:00Z".parse().unwrap());
+        let http = rt
+            .block_on(server.serve_http("127.0.0.1:0".parse().unwrap()))
+            .unwrap();
+        (rt, http, server)
+    }
+
+    #[test]
+    fn login_from_piped_stdin_against_loopback() {
+        let (_rt, http, server) = serve();
+        let mut h = Harness::new();
+        h.write_config(&format!(
+            "[accounts.demo]\nsession_url = \"{}\"\n",
+            http.session_url()
+        ));
+        h.stdin = io::Cursor::new(format!("{}\n", server.token()).into_bytes());
+        let (result, out, _) = h.run(&["login"]);
+        result.unwrap();
+        assert!(out.contains("Signed in as mira@example.org"), "{out}");
+        assert!(out.contains("Masked Email: yes"));
+        assert!(out.contains("Token saved in the memory store for account \"demo\""));
+        assert_eq!(
+            h.store.get("demo").unwrap().unwrap().expose(),
+            server.token()
+        );
+        // The address is printed, never written into the config.
+        let config = std::fs::read_to_string(&h.paths.config_file).unwrap();
+        assert!(!config.contains("mira@"));
+    }
+
+    #[test]
+    fn login_with_a_bad_token_exits_with_auth() {
+        let (_rt, http, _server) = serve();
+        let mut h = Harness::new();
+        h.write_config(&format!(
+            "[accounts.demo]\nsession_url = \"{}\"\n",
+            http.session_url()
+        ));
+        h.stdin = io::Cursor::new(b"fmu1-not-the-right-token\n".to_vec());
+        let (result, _, _) = h.run(&["login"]);
+        let e = result.unwrap_err();
+        assert_eq!(e.code, exit::AUTH);
+        assert!(e.message.contains("401"));
+        assert!(h.store.get("demo").unwrap().is_none());
+    }
+
+    #[test]
+    fn login_with_empty_input_is_cancelled_or_refused() {
+        let mut h = Harness::new();
+        let (result, _, _) = h.run(&["login"]);
+        assert_eq!(result.unwrap_err().code, exit::FAILURE);
+        h.stdin = io::Cursor::new(b"two words\n".to_vec());
+        let (result, _, _) = h.run(&["login"]);
+        let e = result.unwrap_err();
+        assert_eq!(e.code, exit::AUTH);
+        assert!(!e.message.contains("words"));
+    }
+
+    #[test]
+    fn logout_removes_token_and_cache_and_asks_about_state() {
+        let mut h = Harness::new();
+        h.store
+            .set("default", &Secret::new("fmu1-test-token-0002"))
+            .unwrap();
+        let dir = h.paths.ensure_account_dir("default").unwrap();
+        for f in ["cache.db", "cache.db-wal", "state.db", "state.db-wal"] {
+            std::fs::write(dir.join(f), b"x").unwrap();
+        }
+        // Not a terminal and no --yes: state.db stays.
+        let (result, out, _) = h.run(&["logout"]);
+        result.unwrap();
+        assert!(out.contains("Removed the token"), "{out}");
+        assert!(out.contains("Removed the local cache"));
+        assert!(out.contains("Kept state.db"));
+        assert!(!dir.join("cache.db").exists());
+        assert!(!dir.join("cache.db-wal").exists());
+        assert!(dir.join("state.db").exists());
+        assert!(h.store.get("default").unwrap().is_none());
+
+        // A terminal that answers "n" keeps it; "y" removes it.
+        h.stdin_is_tty = true;
+        h.stdin = io::Cursor::new(b"n\n".to_vec());
+        let (result, _, err) = h.run(&["logout"]);
+        result.unwrap();
+        assert!(err.contains("[y/N]"));
+        assert!(dir.join("state.db").exists());
+        h.stdin = io::Cursor::new(b"y\n".to_vec());
+        let (result, out, _) = h.run(&["logout"]);
+        result.unwrap();
+        assert!(out.contains("Removed the outbox"), "{out}");
+        assert!(!dir.join("state.db").exists());
+        assert!(!dir.join("state.db-wal").exists());
+    }
+
+    #[test]
+    fn logout_refuses_while_mejl_runs() {
+        let mut h = Harness::new();
+        let dir = h.paths.ensure_account_dir("default").unwrap();
+        std::fs::write(dir.join("cache.db"), b"x").unwrap();
+        let _held = InstanceLock::acquire(&dir).unwrap();
+        let (result, _, _) = h.run(&["logout", "--yes"]);
+        assert_eq!(result.unwrap_err().code, exit::LOCKED);
+        assert!(dir.join("cache.db").exists());
+    }
+
+    #[test]
+    fn logout_reports_a_locked_keyring() {
+        let mut h = Harness::new();
+        h.store.fail_with(Some("locked"));
+        let (result, _, _) = h.run(&["logout"]);
+        assert_eq!(result.unwrap_err().code, exit::AUTH);
+    }
+
+    #[test]
+    fn demo_needs_a_terminal_and_starts_nothing_without_one() {
+        let mut h = Harness::new();
+        let (result, out, _) = h.run(&["--demo"]);
+        let e = result.unwrap_err();
+        assert_eq!(e.message, NEEDS_TERMINAL);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn keys_check_reports_bad_overrides() {
+        let mut h = Harness::new();
+        h.write_config("[keys.list]\nj = \"nxet\"\n");
+        let (result, out, _) = h.run(&["keys", "--check"]);
+        assert_eq!(result.unwrap_err().code, exit::CONFIG);
+        assert!(out.contains("nxet"), "{out}");
+    }
+
+    #[test]
+    fn demo_config_is_a_copy_in_the_demo_dir() {
+        let h = Harness::new();
+        h.write_config("[ui]\ntheme = \"mono\"\n");
+        let demo = DemoBackend::start(DemoOptions::default()).unwrap();
+        let mut stdin = io::Cursor::new(Vec::new());
+        let ctx = Context {
+            paths: h.paths.clone(),
+            env: Env::default(),
+            store: &h.store,
+            transport: None,
+            stdin: &mut stdin,
+            stdin_is_tty: false,
+            stdout_is_tty: false,
+        };
+        let copy = demo_config(&ctx, &demo).unwrap();
+        assert!(copy.starts_with(demo.base_dir()));
+        assert_ne!(copy, h.paths.config_file);
+        assert!(std::fs::read_to_string(&copy).unwrap().contains("mono"));
+    }
+
+    #[test]
+    fn unknown_account_with_configured_accounts_fails() {
+        let mut h = Harness::new();
+        h.write_config("[accounts.home]\n");
+        let (result, _, _) = h.run(&["--account", "hmoe"]);
+        let e = result.unwrap_err();
+        assert_eq!(e.code, exit::CONFIG);
+        assert!(e.message.contains("known accounts: home"));
+    }
+}

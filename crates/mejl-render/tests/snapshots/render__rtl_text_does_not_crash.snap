@@ -1,0 +1,16 @@
+---
+source: crates/mejl-render/tests/render.rs
+expression: "dump(&render_plain(text, &opts(30)))"
+---
+width 30 | source Plain | remote images 0 | trackers 0 | truncated false | fallback false
+--- lines
+  0 |שלום עולם, זהו טקסט בעברית.
+  1 |مرحبا بالعالم
+  2 |{l1:https://example.com/ar}{m1:[1]} هذا
+  3 |نص عربي
+  4 |reversed and isolated
+  5 |
+  6 |{m1:[1] }{l1:https://example.com/ar}
+--- folds
+--- links
+[1] https://example.com/ar | https://example.com/ar

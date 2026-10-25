@@ -1,0 +1,18 @@
+{
+  "methodResponses": [
+    ["MaskedEmail/set", {
+      "accountId": "u1234abcd",
+      "oldState": null,
+      "newState": null,
+      "created": {
+        "k1": {
+          "id": "masked-777777",
+          "email": "examplenews.qz4ty@example.com",
+          "createdAt": "2026-10-23T12:00:00Z"
+        }
+      },
+      "notCreated": null
+    }, "s0"]
+  ],
+  "sessionState": "cyrus-0;p-0"
+}

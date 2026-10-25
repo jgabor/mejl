@@ -1,0 +1,48 @@
+{
+  "using": [ "urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail", "urn:ietf:params:jmap:submission" ],
+  "methodCalls": [
+    [ "Email/set", {
+      "accountId": "ue411d190",
+      "create": {
+        "k1490": {
+          "mailboxIds": { "2ea1ca41b38e": true },
+          "keywords": { "$seen": true, "$draft": true },
+          "from": [{ "name": "Joe Bloggs", "email": "joe@example.com" }],
+          "to": [{ "name": "John", "email": "john@example.com" }],
+          "subject": "World domination",
+          "bodyValues": { "t": { "value": "Plans attached." } },
+          "textBody": [{ "partId": "t", "type": "text/plain" }]
+        }
+      }
+    }, "0" ],
+    [ "EmailSubmission/set", {
+      "accountId": "ue411d190",
+      "create": {
+        "k1491": {
+          "identityId": "I64588216",
+          "emailId": "#k1490",
+          "envelope": {
+            "mailFrom": {
+              "email": "john@example.com",
+              "parameters": null
+            },
+            "rcptTo": [{
+              "email": "jane@example.com",
+              "parameters": null
+            }, {
+              "email": "joe@example.com",
+              "parameters": { "NOTIFY": "SUCCESS", "SMTPUTF8": null }
+            }]
+          }
+        }
+      },
+      "onSuccessUpdateEmail": {
+        "#k1491": {
+          "mailboxIds/7cb4e8ee-df87-4757-b9c4-2ea1ca41b38e": null,
+          "mailboxIds/73dbcb4b-bffc-48bd-8c2a-a2e91ca672f6": true,
+          "keywords/$draft": null
+        }
+      }
+    }, "1" ]
+  ]
+}
