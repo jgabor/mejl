@@ -107,6 +107,10 @@ pub enum Msg {
     },
     /// Show an error in the status line.
     Error(String),
+    /// Whether the login can use Masked Email: `None` when it can, or why
+    /// not. The masks screen shows the reason, and the mask actions refuse
+    /// with it.
+    MaskedAccess(Option<String>),
     /// The outcome of a queued mutation or send.
     Outbox(OutboxReport),
     /// Timing of one frame, measured by the shell.

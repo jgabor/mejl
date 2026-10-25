@@ -24,7 +24,30 @@ The demo runs mejl against a fictional mailbox served by a fake server on your o
 
 ## Log in to Fastmail
 
-mejl uses a Fastmail API token.
+```sh
+mejl login
+```
+
+mejl asks how you want to log in: with your browser (OAuth), or by pasting an API token. `mejl login --oauth` and `mejl login --token` skip the question.
+
+### With your browser
+
+mejl opens Fastmail's login page in your browser and waits up to five minutes. If no browser opens, it prints the address to open yourself. After you allow access, the tab says you can close it, and mejl stores the login in your system keyring. It refreshes the login by itself while it runs.
+
+Over SSH, the browser on your own machine cannot reach mejl. Forward a port and tell mejl to use it:
+
+```sh
+ssh -L 8765:127.0.0.1:8765 your-server
+mejl login --port 8765
+```
+
+The first browser login registers mejl as an app with Fastmail, once per device. If Fastmail gave you a client id for mejl, set `oauth_client_id` under your account in the config and mejl uses that instead.
+
+The browser login may not include Masked Email. If Fastmail does not grant it, mejl logs in without it and says so, and the Masked Email screen explains why. Log in with an API token to use masks. `mejl doctor` shows what the login was granted.
+
+Browser login is new and has not been tried against every Fastmail plan yet. If it fails, use an API token.
+
+### With an API token
 
 1. Open the API tokens page in Fastmail's settings: <https://app.fastmail.com/settings/security/tokens>. API tokens need a plan that includes them; Basic plans have none.
 2. Create a new token. Give it these scopes:
@@ -32,13 +55,9 @@ mejl uses a Fastmail API token.
    - Email submission (to send)
    - Masked Email (for the Masked Email screen)
    - Contacts (for address completion)
-3. Copy the token, then run:
+3. Copy the token, run `mejl login --token` and paste it when asked. It is not shown as you paste. mejl checks it with Fastmail, tells you which scopes it found and what is missing, and stores it in your system keyring.
 
-```sh
-mejl login
-```
-
-Paste the token when asked. It is not shown as you paste. mejl checks it with Fastmail, tells you which scopes it found and what is missing, and stores it in your system keyring. Then start mejl:
+Then start mejl:
 
 ```sh
 mejl
@@ -48,12 +67,12 @@ Other commands:
 
 | Command | What it does |
 |---|---|
-| `mejl doctor` | Prints mejl's paths, checks the config and shows what your terminal supports. Never prints the token |
+| `mejl doctor` | Prints mejl's paths, checks the config, shows how you are logged in and what your terminal supports. Never prints a token |
 | `mejl doctor --print-config` | Prints a commented example config |
 | `mejl keys --check` | Checks your key overrides |
-| `mejl logout` | Removes the token and the local cache. It asks before it removes queued changes, drafts and rules |
+| `mejl logout` | Ends the login (a browser login is revoked at Fastmail), removes it and the local cache. It asks before it removes queued changes, drafts and rules |
 
-Without a keyring, set `token_command` in the config (for example `pass show fastmail/mejl`), or set `MEJL_TOKEN` in the environment.
+Without a keyring, set `token_command` in the config (for example `pass show fastmail/mejl`), or set `MEJL_TOKEN` in the environment. Both take an API token and win over a stored login.
 
 ## Config
 

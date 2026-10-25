@@ -1,4 +1,7 @@
-//! `mejl login`: paste an API token, check it, store it.
+//! `mejl login`: log in with the browser, or paste an API token.
+//!
+//! The browser login is in [`crate::oauth_login`]. A pasted token goes
+//! like this:
 //!
 //! 1. The token is read without echo ([`TokenInput`] in raw mode, or one
 //!    line from stdin when it is not a terminal, for scripts).
@@ -6,19 +9,12 @@
 //! 3. mejl reports the account and which capabilities the token grants
 //!    ([`SessionReport`]): mail is required; sending, Masked Email and
 //!    contacts are optional, and each missing one is explained.
-//! 4. The token goes into the secret store under the account name.
+//! 4. Any stored OAuth login for the account is removed, and the token goes
+//!    into the secret store under the account name.
 //!
-//! The session's `username` is the user's address. It is printed for the
-//! user to confirm, and never written to any file.
-//!
-//! # OAuth
-//!
-//! Only API tokens exist today ([`LoginMethod::ApiToken`]). OAuth (dynamic
-//! registration, loopback redirect, PKCE; see `docs/architecture.md`) will
-//! be another [`LoginMethod`] that ends in the same place: a bearer token
-//! passed to [`verify_token`] and then stored. Its refresh token needs a
-//! second keyring entry and a refresh lock, which the store trait can carry
-//! with an extra key per account.
+//! Both end with a [`SessionReport`] from the session. The session's
+//! `username` is the user's address. It is printed for the user to
+//! confirm, and never written to any file.
 
 use std::io::{self, BufRead, Write};
 use std::sync::Arc;
@@ -34,8 +30,9 @@ pub const TOKEN_SETTINGS_URL: &str = "https://app.fastmail.com/settings/security
 
 /// How a login gets its token.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
 pub enum LoginMethod {
+    /// The browser, through OAuth.
+    OAuth,
     /// A pasted API token.
     ApiToken,
 }
@@ -149,6 +146,47 @@ impl SessionReport {
         }
         out
     }
+
+    /// The report for an OAuth login, with the granted scope.
+    pub fn oauth_lines(&self, scope: &[String]) -> Vec<String> {
+        let mut out = vec![format!(
+            "Signed in as {} (account {}).",
+            self.username,
+            if self.account_name.is_empty() {
+                "without a name"
+            } else {
+                &self.account_name
+            }
+        )];
+        for cap in Capability::ALL {
+            if self.present.contains(&cap) {
+                out.push(format!("  {}: yes", cap.scope_name()));
+            } else {
+                out.push(format!(
+                    "  {}: not granted, so {}",
+                    cap.scope_name(),
+                    cap.without()
+                ));
+            }
+        }
+        if self.read_only {
+            out.push("  This login is read-only: archive, flags and sending will fail.".to_owned());
+        }
+        out.push(format!(
+            "  Granted scope: {}",
+            if scope.is_empty() {
+                "(the server did not say)".to_owned()
+            } else {
+                scope.join(" ")
+            }
+        ));
+        if self.missing.contains(&Capability::MaskedEmail) {
+            out.push(
+                "To use masks, log in with an API token instead: `mejl login --token`.".to_owned(),
+            );
+        }
+        out
+    }
 }
 
 /// Reads capabilities from a session. A capability counts only when the
@@ -216,8 +254,46 @@ pub enum LoginError {
         "this token has no access to mail. Make a new token with the Email scope at {TOKEN_SETTINGS_URL}"
     )]
     NoMail(Box<SessionReport>),
-    /// The token could not be saved.
-    #[error("cannot save the token: {0}")]
+    /// The browser login works but grants no mail access.
+    #[error("this login has no access to mail, so mejl cannot work with it")]
+    OAuthNoMail(Box<SessionReport>),
+    /// The authorization server refused the login, in the browser or after.
+    #[error("the login was refused: {0}")]
+    Refused(mejl_jmap::OAuthError),
+    /// The browser did not come back in time.
+    #[error("no answer from the browser within {0}; run `mejl login` again")]
+    TimedOut(String),
+    /// The browser's answer names another server than the one mejl asked.
+    #[error("the browser's answer came from {got}, not from {want}; the login was stopped")]
+    WrongIssuer {
+        /// The `iss` the answer carried.
+        got: String,
+        /// The issuer mejl talked to.
+        want: String,
+    },
+    /// The server always says who it is, but the answer did not.
+    #[error(
+        "the browser's answer did not say which server sent it, though {0} always does; the login was stopped"
+    )]
+    MissingIssuer(String),
+    /// The loopback listener could not start.
+    #[error("cannot listen for the browser on 127.0.0.1 port {port}: {reason}")]
+    Listen {
+        /// The port asked for, 0 for any.
+        port: u16,
+        /// What went wrong.
+        reason: String,
+    },
+    /// Open registration did not work.
+    #[error(
+        "the server would not register mejl as an app ({0}). Set `oauth_client_id` for the account to a client id Fastmail gave you, or log in with an API token: `mejl login --token`"
+    )]
+    Registration(String),
+    /// Another OAuth step went wrong.
+    #[error("{0}")]
+    OAuth(String),
+    /// The login could not be saved.
+    #[error("cannot save the login: {0}")]
     Store(#[from] SecretError),
     /// Reading the terminal failed.
     #[error("cannot read the token: {0}")]
@@ -255,24 +331,57 @@ pub async fn verify_token(
     }
 }
 
-/// Checks a token and stores it. Builds a small runtime for the check and
-/// stores the token after it, outside any runtime, because the keyring
-/// may block on D-Bus. Call from a plain thread.
+/// A finished token login.
+#[derive(Debug)]
+pub struct TokenOutcome {
+    /// What the session says about the token.
+    pub report: SessionReport,
+    /// A stored OAuth login was replaced, and whether revoking it at the
+    /// server worked.
+    pub replaced_oauth: Option<Result<(), String>>,
+}
+
+/// Checks a token and stores it, replacing any stored OAuth login. That
+/// login is revoked at the server first, as a best effort, and its record
+/// is removed before the token is stored, because it would outrank the
+/// token.
+///
+/// Builds a small runtime for the network steps. The store is read before
+/// it and written after it is gone, because the keyring may block on
+/// D-Bus. Call from a plain thread.
 pub fn login_with_token(
     transport: Arc<dyn Transport>,
     session_url: &str,
     account: &str,
     token: Secret,
     store: &dyn SecretStore,
-) -> Result<SessionReport, LoginError> {
+) -> Result<TokenOutcome, LoginError> {
+    // A damaged record is removed below all the same.
+    let old = store.get_oauth(account).ok().flatten();
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
-    let report = runtime.block_on(verify_token(transport, session_url, token.clone()))?;
+    let report = runtime.block_on(verify_token(transport.clone(), session_url, token.clone()))?;
+    let revoked = old
+        .as_ref()
+        .map(|r| runtime.block_on(crate::oauth::revoke(&*transport, r)));
     drop(runtime);
+    let had_oauth = store.delete_oauth(account)?;
     store.set(account, &token)?;
     crate::logging::register_secret(&token);
-    Ok(report)
+    let replaced_oauth = match revoked {
+        Some(result) => Some(result),
+        // The record was there but could not be read, so nothing was
+        // revoked.
+        None if had_oauth => Some(Err(
+            "the stored login was damaged, so it could not be revoked".to_owned(),
+        )),
+        None => None,
+    };
+    Ok(TokenOutcome {
+        report,
+        replaced_oauth,
+    })
 }
 
 /// What one input event did to a [`TokenInput`].
@@ -662,7 +771,8 @@ mod tests {
             Secret::new(server.token()),
             &store,
         )
-        .unwrap();
+        .unwrap()
+        .report;
         assert_eq!(report.username, "mira@example.org");
         assert_eq!(report.present, Capability::ALL);
         assert_eq!(
@@ -687,7 +797,8 @@ mod tests {
             Secret::new(server.token()),
             &store,
         )
-        .unwrap();
+        .unwrap()
+        .report;
         assert!(report.usable());
         assert_eq!(report.present, [Capability::Mail, Capability::Submission]);
         assert_eq!(

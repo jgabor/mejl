@@ -67,7 +67,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use jiff::Timestamp;
-use mejl_jmap::{Client, Id, Patch, capability};
+use mejl_jmap::{Client, Id, OAuthCredentials, Patch, Session, capability};
 use mejl_store::{EmailPatchTarget, Mutation, RuleRecord, Seq, UndoOutcome};
 use mejl_sync::{Command, LocalOutcome, LocalWrite, SearchRequest, SyncEvent, SyncHandle};
 use mejl_ui::{
@@ -98,6 +98,11 @@ pub enum AppEvent {
         /// The saved file, or what went wrong.
         result: Result<PathBuf, String>,
     },
+    /// A refreshed OAuth login could not be saved, for this reason. Sent
+    /// once per run.
+    LoginNotSaved(String),
+    /// Time to try a temporarily locked OAuth login again.
+    RetryLogin,
 }
 
 /// The sending side of the app's channel.
@@ -113,6 +118,12 @@ pub struct AppParts<B: Backend> {
     pub handle: SyncHandle,
     /// The JMAP client the engine uses, for attachment downloads.
     pub client: Client,
+    /// The OAuth login's credentials when `client` has one. After a
+    /// temporary lock the app resets the client with them and tries again.
+    pub oauth: Option<OAuthCredentials>,
+    /// The first wait before trying a temporarily locked login again. It
+    /// doubles up to [`MAX_LOCK_RETRY`]. Normally [`LOCK_RETRY`].
+    pub lock_retry: Duration,
     /// The channel the engine, the timer and the workers send to.
     pub tx: AppSender,
     /// Config and where setting changes are saved.
@@ -211,6 +222,13 @@ pub struct App<B: Backend> {
     host: Box<dyn Host>,
     handle: SyncHandle,
     client: Client,
+    oauth: Option<OAuthCredentials>,
+    lock_retry: Duration,
+    lock_wait: Duration,
+    /// `last_sync` when the login failed; a newer one means sync resumed.
+    auth_mark: Option<Option<Timestamp>>,
+    masked_session: Option<Arc<Session>>,
+    masked_note: Option<String>,
     tx: AppSender,
     timer: Timer,
     pool: RenderPool,
@@ -259,6 +277,24 @@ pub fn auth_message(error: &str) -> String {
         "Fastmail did not accept the API token ({error}). Quit mejl and run `mejl login` to paste a new one."
     )
 }
+
+/// The message for an OAuth login the server refused for good.
+pub const OAUTH_EXPIRED: &str =
+    "Your Fastmail login expired or was revoked. Quit and run `mejl login`.";
+/// The message for an OAuth login the server locked for now.
+pub const OAUTH_LOCKED: &str = "Fastmail has locked this login for now; mejl will keep trying.";
+/// The warning when a refreshed OAuth login could not be saved.
+pub const LOGIN_NOT_SAVED: &str = "Could not save the refreshed login: after quitting, run `mejl login` before starting mejl again";
+/// The masks screen and mask actions for an OAuth login without Masked
+/// Email.
+pub const NO_MASKS_OAUTH: &str =
+    "This login has no Masked Email access. Log in with an API token to use masks.";
+/// The same for an API token without the Masked Email scope.
+pub const NO_MASKS_TOKEN: &str = "This API token has no Masked Email access. Make a new token with the Masked Email scope to use masks.";
+/// The first wait before trying a locked OAuth login again.
+pub const LOCK_RETRY: Duration = Duration::from_secs(60);
+/// The longest wait between tries of a locked OAuth login.
+pub const MAX_LOCK_RETRY: Duration = Duration::from_secs(15 * 60);
 
 /// Only these schemes are opened from mail. Others (`file:`, `javascript:`,
 /// custom app schemes) could run things on the user's machine.
@@ -415,6 +451,12 @@ impl<B: Backend> App<B> {
             host: parts.host,
             handle: parts.handle,
             client: parts.client,
+            oauth: parts.oauth,
+            lock_retry: parts.lock_retry,
+            lock_wait: parts.lock_retry,
+            auth_mark: None,
+            masked_session: None,
+            masked_note: None,
             tx: parts.tx,
             timer,
             pool,
@@ -534,6 +576,11 @@ impl<B: Backend> App<B> {
                     }
                     Err(e) => self.toast(format!("Cannot download {name}: {e}"), ToastLevel::Error),
                 },
+                LoopEvent::Msg(AppEvent::LoginNotSaved(why)) => {
+                    tracing::warn!(error = %why, "the refreshed OAuth login was not saved");
+                    self.toast(LOGIN_NOT_SAVED, ToastLevel::Warning);
+                }
+                LoopEvent::Msg(AppEvent::RetryLogin) => self.retry_login(),
             }
             self.drain();
             if self.quit {
@@ -1493,18 +1540,123 @@ impl<B: Backend> App<B> {
         }
     }
 
+    /// Clears the login error once a sync pass finished after it, which is
+    /// the first sure sign the login works again. The engine's own flag
+    /// clears too early: it drops when a retry starts.
+    fn auth_resumed(&mut self) {
+        if self.auth_error.is_some()
+            && !self.engine_status.auth_failed
+            && self
+                .auth_mark
+                .is_some_and(|mark| self.engine_status.last_sync != mark)
+        {
+            self.auth_error = None;
+            self.auth_mark = None;
+            self.lock_wait = self.lock_retry;
+        }
+    }
+
+    /// Tells the UI whether the session grants Masked Email, each time the
+    /// engine holds a new session. Before the first one nothing is said, so
+    /// masks count as available.
+    fn check_masked_access(&mut self) {
+        let Some(session) = self.client.session() else {
+            return;
+        };
+        if self
+            .masked_session
+            .as_ref()
+            .is_some_and(|s| Arc::ptr_eq(s, &session))
+        {
+            return;
+        }
+        let has = crate::login::assess(&session)
+            .present
+            .contains(&crate::login::Capability::MaskedEmail);
+        self.masked_session = Some(session);
+        let note = (!has).then(|| {
+            if self.oauth.is_some() {
+                NO_MASKS_OAUTH
+            } else {
+                NO_MASKS_TOKEN
+            }
+            .to_owned()
+        });
+        if note != self.masked_note {
+            self.masked_note = note.clone();
+            self.queue.push_back(Event::Msg(Msg::MaskedAccess(note)));
+        }
+    }
+
+    /// Asks for [`AppEvent::RetryLogin`] after the current wait, and
+    /// doubles the next one.
+    fn schedule_login_retry(&mut self) {
+        let Some(io) = &self.io else {
+            return;
+        };
+        let wait = self.lock_wait;
+        self.lock_wait = wait.saturating_mul(2).min(MAX_LOCK_RETRY);
+        let tx = self.tx.clone();
+        tracing::info!(
+            secs = wait.as_secs(),
+            "the OAuth login is locked; trying again later"
+        );
+        io.spawn(async move {
+            tokio::time::sleep(wait).await;
+            let _ = tx.msg(AppEvent::RetryLogin);
+        });
+    }
+
+    /// Tries a locked OAuth login again: a fresh provider with the tokens
+    /// the client holds now, then the engine resumes. Never a static token,
+    /// which would end the OAuth login.
+    fn retry_login(&mut self) {
+        let Some(template) = &self.oauth else {
+            return;
+        };
+        if !self.engine_status.auth_failed {
+            return;
+        }
+        let mut credentials = template.clone();
+        if let Some(tokens) = self.client.oauth_tokens() {
+            credentials.tokens = tokens;
+        }
+        match self.client.set_oauth(credentials) {
+            Ok(()) => {
+                self.handle.send(Command::ResumeAuth);
+            }
+            Err(e) => self.toast(
+                format!("Cannot try the login again: {e}"),
+                ToastLevel::Error,
+            ),
+        }
+    }
+
     fn sync_event(&mut self, e: SyncEvent) {
         match e {
             SyncEvent::Status(s) => {
                 self.engine_status = s;
+                self.auth_resumed();
+                self.check_masked_access();
                 self.show_status();
             }
             SyncEvent::DataChanged(c) => self.changed(convert::data_change(&c)),
-            SyncEvent::AuthFailed { error } => {
-                let text = auth_message(&error);
-                self.auth_error = Some(text.clone());
-                self.show_status();
-                self.queue.push_back(Event::Msg(Msg::Error(text)));
+            SyncEvent::AuthFailed { error, temporary } => {
+                let text = match (&self.oauth, temporary) {
+                    (None, _) => auth_message(&error),
+                    (Some(_), true) => OAUTH_LOCKED.to_owned(),
+                    (Some(_), false) => OAUTH_EXPIRED.to_owned(),
+                };
+                self.auth_mark = Some(self.engine_status.last_sync);
+                // A lock that is still there after a retry says nothing new.
+                if self.auth_error.as_deref() != Some(text.as_str()) {
+                    self.auth_error = Some(text.clone());
+                    self.show_status();
+                    self.queue.push_back(Event::Msg(Msg::Error(text)));
+                }
+                if temporary && self.oauth.is_some() {
+                    self.schedule_login_retry();
+                }
             }
             SyncEvent::Applied {
                 token,

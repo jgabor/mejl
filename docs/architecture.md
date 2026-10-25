@@ -378,7 +378,7 @@ Notes (inferred):
 | Path | Status | Use |
 |---|---|---|
 | API token paste | Works today on Standard and Professional. Not on Basic (verified: [fastmail-platform.md](fastmail-platform.md)) | v0 and onward. Required scopes: Email, Email submission, Contacts, Masked Email. mejl shows the checklist and a direct link to the token settings page |
-| OAuth, open dynamic registration | Discovery metadata advertises `/oauth/register`, PKCE S256, auth method `none`, scopes `urn:ietf:params:oauth:scope:mail`, `...:contacts`, `offline_access` (verified: curl, 2026-10-23). Registration itself untested (unverified) | v1 target for a public release |
+| OAuth, open dynamic registration | Discovery metadata advertises `/oauth/register`, PKCE S256, auth method `none`, scopes `urn:ietf:params:oauth:scope:mail`, `...:contacts`, `offline_access` (verified: curl, 2026-10-23). Registration itself untested live (unverified) | Built: `mejl login --oauth`, the default choice in `mejl login` |
 | OAuth, manually registered client | Documented: clients "are currently registered manually by contact with Fastmail developers" (verified) | Fallback if open registration fails, or to get the `dev/maskedemail` scope |
 | Browser cookies, private APIs | Forbidden by policy | Never |
 
@@ -392,6 +392,14 @@ Notes (inferred):
 6. Refresh tokens rotate on every use, and reusing an old one revokes the grant (verified). So: serialize refreshes behind one mutex, write the new refresh token to the keyring and fsync before using the new access token, and never retry an old refresh token. The draft says servers should keep the old token valid until the new one is used, which softens a lost response, but Fastmail's behaviour is untested (unverified).
 7. Headless SSH: no device flow exists (verified). Offer token paste, or loopback through SSH port forwarding.
 8. The token exchange is hand-rolled on reqwest. The `oauth2` crate's reqwest integration pins reqwest 0.12 (verified: [rust-crates.md](rust-crates.md)).
+
+As built (2026-10-25):
+
+- `mejl_jmap::oauth` holds discovery, registration, PKCE, the authorize URL, code exchange, refresh and revoke over the `Transport` trait. `mejl_jmap::credentials` puts a self-refreshing OAuth provider inside `Client`: it refreshes 60 s before expiry and once on a 401 (not a 403), single-flight, re-reads the stored login before each refresh to adopt another process's newer one, saves before it uses a new token, retries a lost refresh response once with the same refresh token, and never sends a spent refresh token.
+- Only the TUI and `mejl login` refresh. `doctor` and `logout` read the stored record; `logout` revokes.
+- The login lives in the keyring as compact JSON under the user `<account>:oauth`. An OAuth login and an API token login replace each other.
+- A temporary `invalid_grant` keeps mejl waiting and retrying; any other refusal asks for `mejl login`.
+- A stored, dynamically registered client id is checked first with a junk refresh token: `invalid_client` means register again (a heuristic; the authorize page shows an error page instead of redirecting).
 
 Masked Email over open-registered OAuth is an open question: `dev/maskedemail` is not in `scopes_supported` (verified). If it cannot be requested, mejl keeps a token login for mask features or asks Fastmail for a registered client.
 

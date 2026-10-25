@@ -9,8 +9,10 @@
 //! | [`cli`] | Arguments, commands and exit codes |
 //! | [`paths`] | Config, data, cache and state directories |
 //! | [`config`] | The TOML config, its defaults and checks |
-//! | [`secrets`] | Token storage: keyring, `token_command`, `MEJL_TOKEN` |
+//! | [`secrets`] | Login storage: keyring tokens and OAuth logins, `token_command`, `MEJL_TOKEN` |
 //! | [`login`] | Token paste, check against the session, report |
+//! | [`oauth_login`] | Browser login: discovery, client id, loopback listener, code exchange |
+//! | [`oauth`] | The stored OAuth login and the token store the TUI's client saves through |
 //! | [`lock`] | One mejl per account |
 //! | [`terminal`] | Setup, restore, suspend, probe, OSC 52 and OSC 8, `$EDITOR`, signals |
 //! | [`events`] | The main loop's channel |
@@ -43,6 +45,8 @@ pub mod keys;
 pub mod lock;
 pub mod logging;
 pub mod login;
+pub mod oauth;
+pub mod oauth_login;
 pub mod paths;
 pub mod render_pool;
 pub mod secrets;

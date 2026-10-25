@@ -14,7 +14,32 @@ use crate::text::sanitize;
 /// Messages read to list who mails an address.
 const SENDER_SAMPLE: usize = 50;
 
+/// Actions that change masks on the server, which a login without Masked
+/// Email access cannot do.
+fn changes_masks(action: Action) -> bool {
+    matches!(
+        action,
+        Action::MaskedNew
+            | Action::MaskedEnable
+            | Action::MaskedDisable
+            | Action::MaskedDelete
+            | Action::MaskedRename
+    )
+}
+
 impl AppState {
+    /// Says why masks cannot change when the login has no Masked Email
+    /// access, and returns true then.
+    pub(crate) fn masks_refused(&mut self, cmds: &mut Vec<Cmd>) -> bool {
+        match self.masked_unavailable.clone() {
+            Some(why) => {
+                self.notify(why, ToastLevel::Warning, false, cmds);
+                true
+            }
+            None => false,
+        }
+    }
+
     /// Opens the Masked Email screen, at `id` if given.
     pub(crate) fn open_masked(&mut self, data: &dyn MailData, id: Option<&str>) {
         let mut cmds = Vec::new();
@@ -143,6 +168,12 @@ impl AppState {
         action: Action,
         cmds: &mut Vec<Cmd>,
     ) -> bool {
+        if self.masked.is_none() {
+            return false;
+        }
+        if changes_masks(action) && self.masks_refused(cmds) {
+            return true;
+        }
         let Some(s) = self.masked.as_mut() else {
             return false;
         };
@@ -304,6 +335,9 @@ impl AppState {
                 | Action::MaskedNew
         ) {
             return false;
+        }
+        if changes_masks(action) && self.masks_refused(cmds) {
+            return true;
         }
         if action == Action::MaskedNew {
             let domain = self

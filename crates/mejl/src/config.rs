@@ -12,6 +12,7 @@
 //! | `accounts.<name>.session_url` | `https://api.fastmail.com/jmap/session` | JMAP session resource |
 //! | `accounts.<name>.username` | none | Shown in the UI only. Never sent anywhere |
 //! | `accounts.<name>.token_command` | none | Command that prints the token, for systems without a keyring |
+//! | `accounts.<name>.oauth_client_id` | none | OAuth client id Fastmail gave you, used by `mejl login` instead of registering one |
 //! | `ui.theme` | `terminal` | Built-in theme name, or `auto:<name>` |
 //! | `ui.preset` | `fastmail` | Key preset: `fastmail`, `vim`, or the name of a custom preset |
 //! | `ui.density` | `comfortable` | List density: `compact`, `comfortable` or `relaxed` |
@@ -118,6 +119,9 @@ pub struct AccountConfig {
     /// shell. For systems without a keyring, for example
     /// `pass show fastmail/mejl`.
     pub token_command: Option<String>,
+    /// An OAuth client id registered with Fastmail by hand. `mejl login`
+    /// uses it instead of registering a client of its own.
+    pub oauth_client_id: Option<String>,
 }
 
 impl Default for AccountConfig {
@@ -127,6 +131,7 @@ impl Default for AccountConfig {
             session_url: FASTMAIL_SESSION_URL.to_owned(),
             username: None,
             token_command: None,
+            oauth_client_id: None,
         }
     }
 }
@@ -441,7 +446,12 @@ const TOP_KEYS: &[&str] = &[
     "sync",
 ];
 const PRESET_KEYS: &[&str] = &["base", "keys"];
-const ACCOUNT_KEYS: &[&str] = &["session_url", "username", "token_command"];
+const ACCOUNT_KEYS: &[&str] = &[
+    "session_url",
+    "username",
+    "token_command",
+    "oauth_client_id",
+];
 const UI_KEYS: &[&str] = &[
     "theme",
     "preset",
@@ -651,6 +661,26 @@ fn validate(
                 format!("`accounts.{name}.token_command` is empty; remove it or name a command"),
             ));
         }
+        if let Some(id) = account.oauth_client_id.as_deref() {
+            let span = span_of(doc, &["accounts", name.as_str(), "oauth_client_id"]);
+            if id.trim().is_empty() || id.chars().any(|c| c.is_whitespace() || c.is_control()) {
+                errors.push(at(
+                    text,
+                    span,
+                    format!(
+                        "`accounts.{name}.oauth_client_id` must be a client id without spaces; remove it to let `mejl login` register one"
+                    ),
+                ));
+            } else if account.token_command.is_some() {
+                warnings.push(at(
+                    text,
+                    span,
+                    format!(
+                        "`accounts.{name}.oauth_client_id` is set, but so is `token_command`, which wins: mejl uses the API token it prints and never the OAuth login"
+                    ),
+                ));
+            }
+        }
     }
 
     if let Some(default) = &config.default_account
@@ -764,14 +794,17 @@ pub fn example_config() -> String {
 # default_account = "personal"
 
 # One section per account. Without any, mejl uses one account called
-# "default" on Fastmail. The API token is never stored here: `mejl login`
-# puts it in the OS keyring.
+# "default" on Fastmail. Tokens are never stored here: `mejl login` puts
+# them in the OS keyring.
 # [accounts.personal]
 # session_url = "{FASTMAIL_SESSION_URL}"
 # Shown in the UI only.
 # username = "you@example.com"
 # For systems without a keyring: a command whose first output line is the token.
 # token_command = "pass show fastmail/mejl"
+# An OAuth client id Fastmail gave you. Without it, `mejl login` registers
+# its own client the first time you log in with the browser.
+# oauth_client_id = "your-client-id"
 
 [ui]
 # Built-in themes: {themes}. "auto:<name>" picks a light or dark variant.
@@ -1054,6 +1087,39 @@ body_cache_mb = 512
         let e = errors("default_account = \"nope\"\n[accounts.a]\n");
         assert_eq!(e[0].line, 1);
         assert!(e[0].message.contains("nope"));
+    }
+
+    #[test]
+    fn oauth_client_id_is_read_checked_and_warned_about() {
+        let loaded = parse("[accounts.a]\noauth_client_id = \"client-123\"\n").unwrap();
+        assert!(loaded.warnings.is_empty(), "{:?}", loaded.warnings);
+        let a = loaded.config.account(Some("a")).unwrap();
+        assert_eq!(a.oauth_client_id.as_deref(), Some("client-123"));
+        for bad in ["\"\"", "\"two words\""] {
+            let e = errors(&format!("[accounts.a]\noauth_client_id = {bad}\n"));
+            assert_eq!(e[0].line, 2, "{e:?}");
+            assert!(e[0].message.contains("oauth_client_id"), "{e:?}");
+        }
+        let loaded = parse(
+            "[accounts.a]\ntoken_command = \"pass show x\"\noauth_client_id = \"client-123\"\n",
+        )
+        .unwrap();
+        assert_eq!(loaded.warnings.len(), 1);
+        assert_eq!(loaded.warnings[0].line, 3);
+        assert!(
+            loaded.warnings[0].message.contains("token_command"),
+            "{:?}",
+            loaded.warnings
+        );
+        // A typo is caught like other account keys.
+        let loaded = parse("[accounts.a]\noauth_clientid = \"x\"\n").unwrap();
+        assert!(
+            loaded.warnings[0]
+                .message
+                .contains("did you mean `accounts.a.oauth_client_id`"),
+            "{:?}",
+            loaded.warnings
+        );
     }
 
     #[test]

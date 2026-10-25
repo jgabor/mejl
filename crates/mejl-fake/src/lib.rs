@@ -30,6 +30,11 @@
 //!   `AddressBook/get` and `ContactCard/get` and `/changes`, with result
 //!   references, creation ids, state strings and change logs.
 //! - EventSource push at `GET /jmap/event` and blob upload and download.
+//! - OAuth as Fastmail serves it: discovery documents, open registration,
+//!   `/oauth/authorize`, the token endpoint at `/oauth/refresh` with
+//!   rotating refresh tokens, and `/oauth/revoke`. The fixed token keeps
+//!   working with every capability; an OAuth token sees Masked Email only
+//!   with that scope.
 //! - Fastmail quirks and injected faults, switchable at runtime through
 //!   [`FakeServer::quirks_mut`].
 
@@ -42,6 +47,7 @@ mod demo;
 mod http;
 mod ids;
 mod model;
+mod oauth;
 mod push;
 mod serve;
 mod sim;
@@ -60,6 +66,7 @@ use tokio::sync::broadcast;
 pub use config::{EventSourceUrl, FakeConfig, Limits, PushShape, Quirks};
 pub use http::IN_PROCESS_BASE;
 pub use model::{Address, MaskedEmailState};
+pub use oauth::OAuthGrant;
 pub use serve::HttpHandle;
 pub use sim::{AttachmentSpec, ExternalChange, IncomingMessage};
 pub use store::MASKED_EMAIL_HEADER;
@@ -113,6 +120,7 @@ pub(crate) struct Inner {
     pub(crate) events: broadcast::Sender<StateChange>,
     pub(crate) token: String,
     pub(crate) account_id: String,
+    pub(crate) oauth: Mutex<oauth::OAuthState>,
 }
 
 /// The fake server. Cheap to clone; every clone shares one account.
@@ -147,6 +155,7 @@ impl FakeServer {
                 events,
                 token: config.token.clone(),
                 account_id: config.account_id.clone(),
+                oauth: Mutex::new(oauth::OAuthState::default()),
             }),
         }
     }

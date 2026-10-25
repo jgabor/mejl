@@ -422,6 +422,20 @@ pub(crate) fn is_header_name(name: &str) -> bool {
     !name.is_empty() && name.bytes().all(|b| (33..=126).contains(&b) && b != b':')
 }
 
+/// Escapes everything but the unreserved characters of RFC 3986, for query
+/// strings and form bodies.
+pub(crate) fn percent_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        if b.is_ascii_alphanumeric() || b"-._~".contains(&b) {
+            out.push(char::from(b));
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
+}
+
 /// Decodes `%XX` escapes and `+` as space, for query strings. Invalid
 /// escapes are kept as written.
 pub(crate) fn percent_decode(s: &str) -> String {
@@ -608,6 +622,9 @@ mod tests {
         assert_eq!(percent_decode("Email%2CMailbox+x"), "Email,Mailbox x");
         assert_eq!(percent_decode("%zz%4"), "%zz%4");
         assert_eq!(percent_decode("%E2%82%AC"), "€");
+        let raw = "a+b /c=d&€~";
+        assert_eq!(percent_encode(raw), "a%2Bb%20%2Fc%3Dd%26%E2%82%AC~");
+        assert_eq!(percent_decode(&percent_encode(raw)), raw);
     }
 
     #[test]

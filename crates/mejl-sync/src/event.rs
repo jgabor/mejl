@@ -18,12 +18,17 @@ pub enum SyncEvent {
     /// merged and sent at most once per
     /// [`EngineConfig::data_coalesce`](crate::EngineConfig::data_coalesce).
     DataChanged(DataChanges),
-    /// The credentials were rejected (HTTP 401 or 403). The engine stops
-    /// talking to the server until
-    /// [`Command::SetToken`](crate::Command::SetToken) arrives.
+    /// The credentials were rejected (HTTP 401 or 403), or an OAuth refresh
+    /// was refused or lost. The engine stops talking to the server until
+    /// [`Command::SetToken`](crate::Command::SetToken) or
+    /// [`Command::ResumeAuth`](crate::Command::ResumeAuth) arrives.
     AuthFailed {
         /// What the server said.
         error: String,
+        /// The OAuth server refused a refresh with `temporary: true`: the
+        /// login is locked for now, not revoked, so trying again later may
+        /// work.
+        temporary: bool,
     },
     /// A mutation command was queued and its overlay is in the store. Drop
     /// the caller's own pending overlay for `token` and re-read `changed`.
@@ -273,6 +278,8 @@ pub struct SyncStatus {
     pub last_error: Option<String>,
     /// The credentials were rejected and the engine is waiting for new ones.
     pub auth_failed: bool,
+    /// The rejection is a temporary lock. See [`SyncEvent::AuthFailed`].
+    pub auth_temporary: bool,
 }
 
 impl Default for SyncStatus {
@@ -291,6 +298,7 @@ impl Default for SyncStatus {
             activity: Activity::default(),
             last_error: None,
             auth_failed: false,
+            auth_temporary: false,
         }
     }
 }

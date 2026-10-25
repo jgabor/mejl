@@ -133,10 +133,12 @@ fn map_error(err: reqwest::Error) -> TransportError {
     // Without the URL: it may carry query parameters worth keeping out of
     // logs, and callers know which request failed.
     let err = err.without_url();
-    if err.is_timeout() {
-        TransportError::Timeout
-    } else if err.is_connect() {
+    // A timeout while connecting is a connect error: the request was never
+    // sent, which the OAuth refresh relies on to tell a lost answer apart.
+    if err.is_connect() {
         TransportError::Connect(describe(&err))
+    } else if err.is_timeout() {
+        TransportError::Timeout
     } else {
         TransportError::Other(describe(&err))
     }

@@ -1,7 +1,9 @@
 //! The whole app, headless: the real loop, the real engine and store, and
 //! mejl-fake in process. Keys go in as terminal events; assertions read
 //! the drawn screen and the fake server's state. Nothing here touches the
-//! network, a keyring or the user's directories.
+//! network, a keyring or the user's directories. OAuth tests serve the fake
+//! on 127.0.0.1 instead, because OAuth endpoints must be loopback or https,
+//! and keep the login in a `MemoryStore`.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -15,11 +17,15 @@ use mejl::app::settings::Settings;
 use mejl::app::{App, AppEvent, AppParts};
 use mejl::config::Config;
 use mejl::events::{self, LoopEvent, LoopReceiver, TimedEvent};
+use mejl::oauth::{ClientSource, OAuthRecord};
+use mejl::secrets::{MemoryStore, SecretStore};
+use mejl_fake::HttpHandle;
 use mejl_fake::{Address, AttachmentSpec, ExternalChange, FakeConfig, FakeServer, IncomingMessage};
+use mejl_jmap::oauth::{self, scope};
 use mejl_jmap::transport::{
     BoxFuture, HttpRequest, HttpResponse, StreamingResponse, Transport, TransportError,
 };
-use mejl_jmap::{Client, Secret};
+use mejl_jmap::{Client, HttpTransport, Secret};
 use mejl_store::{Store, StoreOptions};
 use mejl_sync::{Engine, EngineConfig};
 use mejl_ui::{MailData, Screen};
@@ -37,7 +43,12 @@ struct Harness {
     host: RecordingHost,
     requests: Arc<AtomicUsize>,
     delay_ms: Arc<AtomicU64>,
+    client: Client,
+    /// Where an OAuth login is kept.
+    secrets: Arc<MemoryStore>,
     _dir: tempfile::TempDir,
+    // Last, so the app and its engine stop before the server does.
+    http: Option<(HttpHandle, tokio::runtime::Runtime)>,
 }
 
 fn engine_config() -> EngineConfig {
@@ -94,6 +105,9 @@ struct Setup {
     toast: Option<Duration>,
     config: Config,
     undo_send: Duration,
+    /// Log in with OAuth asking for these scopes, over loopback HTTP,
+    /// instead of using the fixed token in process.
+    oauth: Option<Vec<&'static str>>,
 }
 
 impl Setup {
@@ -105,8 +119,94 @@ impl Setup {
             toast: None,
             config: Config::default(),
             undo_send: UNDO_SEND,
+            oauth: None,
         }
     }
+
+    /// The demo with an OAuth login that has every scope.
+    fn oauth() -> Setup {
+        Setup {
+            oauth: Some(ALL_SCOPES.to_vec()),
+            ..Setup::demo()
+        }
+    }
+}
+
+/// Every scope the fake knows that mejl asks for.
+const ALL_SCOPES: &[&str] = &[
+    scope::MAIL,
+    scope::CONTACTS,
+    scope::OFFLINE_ACCESS,
+    scope::JMAP_CORE,
+    scope::MASKED_EMAIL,
+];
+
+/// The fake served on 127.0.0.1, with a runtime that keeps it serving.
+fn serve_loopback(server: &FakeServer) -> (HttpHandle, tokio::runtime::Runtime) {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .unwrap();
+    let http = rt
+        .block_on(server.serve_http("127.0.0.1:0".parse().unwrap()))
+        .unwrap();
+    (http, rt)
+}
+
+/// An OAuth login made the way `mejl login` makes one: discovery,
+/// registration, the authorization redirect read without following it, and
+/// the code exchange.
+fn oauth_login(http: &HttpHandle, rt: &tokio::runtime::Runtime, scopes: &[&str]) -> OAuthRecord {
+    let t = HttpTransport::new().unwrap();
+    rt.block_on(async {
+        let meta = oauth::discover(&t, &http.session_url()).await.unwrap();
+        let client_id = oauth::register(&t, meta.registration_endpoint.as_deref().unwrap())
+            .await
+            .unwrap();
+        let pkce = oauth::Pkce::generate().unwrap();
+        let state = oauth::random_state().unwrap();
+        let redirect = "http://127.0.0.1:9/";
+        let url = oauth::authorize_url(
+            &meta.authorization_endpoint,
+            &client_id,
+            redirect,
+            scopes,
+            &state,
+            &pkce,
+        )
+        .unwrap();
+        let resp = t
+            .send(HttpRequest {
+                method: mejl_jmap::transport::HttpMethod::Get,
+                url,
+                headers: Vec::new(),
+                body: None,
+            })
+            .await
+            .unwrap();
+        assert_eq!(resp.status, 302);
+        let callback = oauth::parse_callback(resp.header("location").unwrap());
+        assert_eq!(callback.state.as_deref(), Some(state.as_str()));
+        let tokens = oauth::exchange_code(
+            &t,
+            &meta.token_endpoint,
+            &client_id,
+            callback.code.as_ref().unwrap(),
+            redirect,
+            &pkce,
+        )
+        .await
+        .unwrap();
+        OAuthRecord {
+            client_id,
+            client_source: ClientSource::Registered,
+            issuer: meta.issuer,
+            token_endpoint: meta.token_endpoint,
+            revocation_endpoint: meta.revocation_endpoint,
+            tokens,
+        }
+    })
 }
 
 impl Harness {
@@ -118,19 +218,50 @@ impl Harness {
             toast,
             config,
             undo_send,
+            oauth: oauth_scopes,
         } = setup;
         let dir = tempfile::tempdir().unwrap();
         let store = Store::open(dir.path().join("acct"), StoreOptions::default()).unwrap();
         let requests = Arc::new(AtomicUsize::new(0));
         let delay_ms = Arc::new(AtomicU64::new(0));
+        let http = oauth_scopes.is_some().then(|| serve_loopback(&server));
+        let inner: Arc<dyn Transport> = match &http {
+            Some(_) => Arc::new(HttpTransport::new().unwrap()),
+            None => Arc::new(server.transport()),
+        };
         let transport: Arc<dyn Transport> = Arc::new(Counting {
-            inner: Arc::new(server.transport()),
+            inner,
             count: requests.clone(),
             delay_ms: delay_ms.clone(),
         });
-        let token = token.unwrap_or_else(|| server.token().to_owned());
-        let client = Client::new(transport, server.session_url(), Secret::new(token));
+        let secrets = Arc::new(MemoryStore::new());
+        let (client, oauth) = match (&http, &oauth_scopes) {
+            (Some((handle, rt)), Some(scopes)) => {
+                let record = oauth_login(handle, rt, scopes);
+                secrets.set_oauth("test", &record).unwrap();
+                let (client, session) = mejl::oauth::oauth_client(
+                    transport,
+                    &handle.session_url(),
+                    secrets.clone(),
+                    "test",
+                    record,
+                )
+                .unwrap();
+                (client, Some(session))
+            }
+            _ => {
+                let token = token.unwrap_or_else(|| server.token().to_owned());
+                let client = Client::new(transport, server.session_url(), Secret::new(token));
+                (client, None)
+            }
+        };
         let (tx, rx) = events::channel::<AppEvent>();
+        if let Some(session) = &oauth {
+            let save_tx = tx.clone();
+            session.store.on_save_error(move |why| {
+                let _ = save_tx.msg(AppEvent::LoginNotSaved(why));
+            });
+        }
         let sink = tx.clone();
         let handle = Engine::start(engine, client.clone(), store, move |e| {
             let _ = sink.msg(AppEvent::Sync(e));
@@ -147,7 +278,9 @@ impl Harness {
             terminal: Terminal::new(TestBackend::new(w, h)).unwrap(),
             host: Box::new(host.clone()),
             handle,
-            client,
+            client: client.clone(),
+            oauth: oauth.map(|o| o.credentials),
+            lock_retry: Duration::from_millis(200),
             tx,
             settings,
             ui,
@@ -164,7 +297,10 @@ impl Harness {
             host,
             requests,
             delay_ms,
+            client,
+            secrets,
             _dir: dir,
+            http,
         }
     }
 
@@ -1799,5 +1935,234 @@ fn the_key_editor_duplicates_rebinds_and_the_new_key_works_without_a_restart() {
     hs.keys("esc esc esc");
     assert_eq!(*hs.app.state().screen(), Screen::Mail);
     archive_and_undo(&mut hs, "ctrl-g", false);
+    hs.quit();
+}
+
+// ----- OAuth logins, over loopback HTTP -----
+
+/// The same tokens. The stored expiry has whole seconds only.
+fn same_login(a: &mejl_jmap::TokenSet, b: &mejl_jmap::TokenSet) -> bool {
+    a.access == b.access
+        && a.refresh == b.refresh
+        && a.scope == b.scope
+        && a.expires_at.as_second() == b.expires_at.as_second()
+}
+
+fn deliver(hs: &Harness, subject: &str) {
+    hs.server
+        .deliver_incoming(
+            IncomingMessage::new(
+                Address::new("Harbour Library", "notices@library.example.org"),
+                subject,
+            )
+            .text("It is at the front desk."),
+        )
+        .unwrap();
+}
+
+#[test]
+fn an_oauth_login_keeps_syncing_across_an_expired_access_token() {
+    let mut hs = Harness::synced_with(Setup::oauth(), 160, 40);
+    let first = hs.secrets.get_oauth("test").unwrap().unwrap();
+    assert_eq!(hs.server.oauth_refreshes(), 0);
+    hs.server.expire_access_tokens();
+    deliver(&hs, "Your interlibrary loan has arrived");
+    hs.key("ctrl-l");
+    hs.wait_text(
+        "mail after the refresh",
+        "Your interlibrary loan has arrived",
+    );
+    hs.wait("the rotated login to be saved", |hs| {
+        hs.secrets
+            .get_oauth("test")
+            .unwrap()
+            .is_some_and(|r| r.tokens.refresh != first.tokens.refresh)
+    });
+    let saved = hs.secrets.get_oauth("test").unwrap().unwrap();
+    let current = hs.client.oauth_tokens().unwrap();
+    assert!(
+        same_login(&saved.tokens, &current),
+        "the saved login is the one in use"
+    );
+    assert_eq!(saved.client_id, first.client_id);
+    assert!(hs.server.oauth_refreshes() >= 1);
+    assert!(!hs.server.oauth_refresh_token_reused());
+    // Again, to show the saved refresh token is the one that works next.
+    hs.server.expire_access_tokens();
+    deliver(&hs, "Second notice about the loan");
+    hs.key("ctrl-l");
+    hs.wait_text(
+        "mail after the second refresh",
+        "Second notice about the loan",
+    );
+    assert!(!hs.server.oauth_refresh_token_reused());
+    assert_eq!(hs.server.oauth_grants().len(), 1);
+    hs.quit();
+}
+
+#[test]
+fn a_refreshed_login_that_cannot_be_saved_warns_once() {
+    let mut hs = Harness::synced_with(Setup::oauth(), 160, 40);
+    hs.secrets.fail_with(Some("the keyring is locked"));
+    hs.server.expire_access_tokens();
+    deliver(&hs, "Your interlibrary loan has arrived");
+    hs.key("ctrl-l");
+    hs.wait_text("the warning", mejl::app::LOGIN_NOT_SAVED);
+    // The new tokens stay in memory, so sync goes on.
+    hs.wait_text(
+        "mail after the refresh",
+        "Your interlibrary loan has arrived",
+    );
+    assert!(!hs.server.oauth_refresh_token_reused());
+    hs.quit();
+}
+
+#[test]
+fn a_locked_oauth_login_says_so_and_keeps_trying() {
+    let mut hs = Harness::synced_with(Setup::oauth(), 160, 40);
+    hs.server.quirks_mut().refresh_temporary_invalid_grant_next = 2;
+    hs.server.expire_access_tokens();
+    deliver(&hs, "Your interlibrary loan has arrived");
+    hs.key("ctrl-l");
+    hs.wait_text("the lock message", "Fastmail has locked this login for now");
+    // Two refused tries, then the lock lifts and sync resumes by itself.
+    hs.wait_text(
+        "mail after the lock lifts",
+        "Your interlibrary loan has arrived",
+    );
+    hs.wait("the error to clear", |hs| {
+        !hs.screen().contains("locked this login")
+    });
+    assert!(hs.server.oauth_refresh_requests() >= 3);
+    assert!(!hs.server.oauth_refresh_token_reused());
+    assert_eq!(hs.server.oauth_grants().len(), 1);
+    hs.quit();
+}
+
+#[test]
+fn a_revoked_oauth_login_asks_to_log_in_again() {
+    let mut hs = Harness::synced_with(Setup::oauth(), 160, 40);
+    let record = hs.secrets.get_oauth("test").unwrap().unwrap();
+    let (_, rt) = hs.http.as_ref().unwrap();
+    rt.block_on(mejl::oauth::revoke(&HttpTransport::new().unwrap(), &record))
+        .unwrap();
+    hs.key("ctrl-l");
+    hs.wait_text(
+        "the login message",
+        "Your Fastmail login expired or was revoked",
+    );
+    assert!(hs.screen().contains("mejl login"));
+    assert!(!hs.screen().contains("API token"), "{}", hs.screen());
+    hs.quit();
+}
+
+#[test]
+fn an_oauth_login_without_masked_email_explains_on_the_masks_screen() {
+    let setup = Setup {
+        oauth: Some(vec![scope::MAIL, scope::CONTACTS, scope::OFFLINE_ACCESS]),
+        ..Setup::demo()
+    };
+    let mut hs = Harness::synced_with(setup, 160, 40);
+    hs.keys("g m");
+    assert_eq!(*hs.app.state().screen(), Screen::Masked);
+    hs.wait_text("the reason", mejl::app::NO_MASKS_OAUTH);
+    assert!(
+        hs.screen().contains("No masked addresses."),
+        "{}",
+        hs.screen()
+    );
+    let before = hs.requests.load(Ordering::SeqCst);
+    // Making a mask is refused with the same words, and nothing is sent.
+    hs.key("n");
+    assert!(hs.app.state().overlays().is_empty(), "no prompt opens");
+    hs.wait_text("the refusal", mejl::app::NO_MASKS_OAUTH);
+    hs.idle(Duration::from_millis(200));
+    assert!(hs.requests.load(Ordering::SeqCst) <= before + 2);
+    assert!(
+        hs.call("MaskedEmail/get", json!({"ids": null}))["list"]
+            .as_array()
+            .is_some_and(|l| l.len() == 20),
+        "no mask was made"
+    );
+    hs.quit();
+}
+
+#[test]
+fn an_oauth_login_with_masked_email_lists_masks() {
+    let mut hs = Harness::synced_with(Setup::oauth(), 160, 40);
+    hs.keys("g m");
+    hs.wait("masks cached", |hs| {
+        hs.app.data().masked_emails().len() == 20
+    });
+    assert!(!hs.screen().contains("no Masked Email access"));
+    hs.quit();
+}
+
+#[test]
+fn two_clients_share_one_store_and_only_one_refreshes() {
+    let server = FakeServer::demo(Timestamp::now());
+    let (http, rt) = serve_loopback(&server);
+    let record = oauth_login(&http, &rt, ALL_SCOPES);
+    let secrets = Arc::new(MemoryStore::new());
+    secrets.set_oauth("test", &record).unwrap();
+    let client = |r: &OAuthRecord| {
+        mejl::oauth::oauth_client(
+            Arc::new(HttpTransport::new().unwrap()),
+            &http.session_url(),
+            secrets.clone(),
+            "test",
+            r.clone(),
+        )
+        .unwrap()
+        .0
+    };
+    let (a, b) = (client(&record), client(&record));
+    server.expire_access_tokens();
+    rt.block_on(a.fetch_session()).unwrap();
+    assert_eq!(server.oauth_refreshes(), 1);
+    // b's tokens are spent; it reads the store and adopts a's new login
+    // instead of sending the old refresh token.
+    rt.block_on(b.fetch_session()).unwrap();
+    assert_eq!(server.oauth_refreshes(), 1, "only one refresh");
+    assert!(!server.oauth_refresh_token_reused());
+    let (a, b) = (a.oauth_tokens().unwrap(), b.oauth_tokens().unwrap());
+    assert!(same_login(&a, &b));
+    assert!(same_login(
+        &secrets.get_oauth("test").unwrap().unwrap().tokens,
+        &a
+    ));
+    assert_eq!(server.oauth_grants().len(), 1);
+}
+
+#[test]
+fn a_lock_retry_after_a_failed_save_never_sends_an_old_refresh_token() {
+    let mut hs = Harness::synced_with(Setup::oauth(), 160, 40);
+    // A refresh whose save fails: the store keeps the first refresh token,
+    // memory has the new one.
+    hs.secrets.fail_with(Some("the keyring is locked"));
+    hs.server.expire_access_tokens();
+    deliver(&hs, "Your interlibrary loan has arrived");
+    hs.key("ctrl-l");
+    hs.wait_text("the warning", mejl::app::LOGIN_NOT_SAVED);
+    hs.wait_text(
+        "mail after the refresh",
+        "Your interlibrary loan has arrived",
+    );
+    hs.secrets.fail_with(None);
+    // Then a lock, and the app's retry with a fresh provider. It must not
+    // adopt the stale token from the store.
+    hs.server.quirks_mut().refresh_temporary_invalid_grant_next = 1;
+    hs.server.expire_access_tokens();
+    deliver(&hs, "Second notice about the loan");
+    hs.key("ctrl-l");
+    hs.wait_text("the lock message", "Fastmail has locked this login for now");
+    hs.wait_text("mail after the lock lifts", "Second notice about the loan");
+    assert!(!hs.server.oauth_refresh_token_reused());
+    assert_eq!(hs.server.oauth_grants().len(), 1);
+    let saved = hs.secrets.get_oauth("test").unwrap().unwrap();
+    assert!(same_login(
+        &saved.tokens,
+        &hs.client.oauth_tokens().unwrap()
+    ));
     hs.quit();
 }

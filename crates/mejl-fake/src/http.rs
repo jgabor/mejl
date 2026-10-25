@@ -11,6 +11,7 @@ use crate::FakeServer;
 use crate::api::{self, CAPABILITIES, CONTACTS, CORE, MAIL, MASKED, SUBMISSION};
 use crate::config::{EventSourceUrl, Quirks};
 use crate::model::{PartKind, Upload};
+use crate::oauth;
 use crate::push;
 use crate::store::Store;
 use crate::text;
@@ -28,7 +29,7 @@ pub(crate) enum Reply {
     Lost,
 }
 
-fn response(status: u16, content_type: &str, body: impl Into<Bytes>) -> Reply {
+pub(crate) fn response(status: u16, content_type: &str, body: impl Into<Bytes>) -> Reply {
     Reply::Full(HttpResponse {
         status,
         headers: vec![("content-type".to_owned(), content_type.to_owned())],
@@ -36,7 +37,7 @@ fn response(status: u16, content_type: &str, body: impl Into<Bytes>) -> Reply {
     })
 }
 
-fn json_reply(status: u16, v: &Value) -> Reply {
+pub(crate) fn json_reply(status: u16, v: &Value) -> Reply {
     response(status, "application/json", v.to_string())
 }
 
@@ -49,7 +50,7 @@ fn problem(status: u16, title: &str, detail: &str) -> Reply {
     )
 }
 
-fn with_header(mut reply: Reply, name: &str, value: &str) -> Reply {
+pub(crate) fn with_header(mut reply: Reply, name: &str, value: &str) -> Reply {
     if let Reply::Full(r) = &mut reply {
         r.headers.push((name.to_owned(), value.to_owned()));
     }
@@ -95,14 +96,25 @@ fn header<'a>(req: &'a HttpRequest, name: &str) -> Option<&'a str> {
         .map(|(_, v)| v.as_str())
 }
 
-fn authorized(req: &HttpRequest, token: &str) -> bool {
-    let Some(value) = header(req, "authorization") else {
-        return false;
-    };
+/// The bearer token of a request, if it has a non-empty one.
+fn bearer(req: &HttpRequest) -> Option<&str> {
+    let value = header(req, "authorization")?;
     let mut parts = value.splitn(2, ' ');
     let scheme = parts.next().unwrap_or("");
     let given = parts.next().unwrap_or("").trim();
-    scheme.eq_ignore_ascii_case("bearer") && !given.is_empty() && given == token
+    (scheme.eq_ignore_ascii_case("bearer") && !given.is_empty()).then_some(given)
+}
+
+/// Whether a JMAP request names Masked Email in `using`.
+fn uses_masked_email(body: &[u8]) -> bool {
+    serde_json::from_slice::<Value>(body)
+        .ok()
+        .and_then(|v| {
+            v.get("using")?
+                .as_array()
+                .map(|u| u.iter().any(|c| c.as_str() == Some(MASKED)))
+        })
+        .unwrap_or(false)
 }
 
 /// Handles one request. `base` is the `scheme://host` the client used, so
@@ -161,19 +173,39 @@ pub(crate) async fn handle(
         let r = response(302, "text/plain", "");
         return with_header(r, "location", &format!("{base}/jmap/session"));
     }
+    if let Some(reply) = oauth::route(server, &req, &segs, &query, &base) {
+        return reply;
+    }
     if segs.first() != Some(&"jmap") {
         return problem(404, "Not Found", "unknown path");
     }
-    if !authorized(&req, &server.inner.token) {
+    let given = bearer(&req);
+    let Some(auth) = given.and_then(|token| server.authenticate(token)) else {
         let r = problem(401, "Unauthorized", "a valid bearer token is required");
-        return with_header(r, "www-authenticate", "Bearer realm=\"mejl-fake\"");
+        return with_header(
+            r,
+            "www-authenticate",
+            &oauth::challenge(&base, given.is_some()),
+        );
+    };
+    let forbidden = {
+        let mut q = server.quirks_mut();
+        let hit = q.http_403_next > 0;
+        q.http_403_next = q.http_403_next.saturating_sub(1);
+        hit
+    };
+    if forbidden {
+        return problem(403, "Forbidden", "injected fault: the token lacks a scope");
     }
     let method = req.method;
     let wrong_method = || problem(405, "Method Not Allowed", "wrong method for this path");
     match segs.as_slice() {
         ["jmap", "session"] => match method {
             HttpMethod::Get => {
-                let quirks = server.quirks_snapshot();
+                let mut quirks = server.quirks_snapshot();
+                if !auth.masked_email() {
+                    quirks.session_without.push(MASKED.to_owned());
+                }
                 let session = server.with_store(|s| session_json(s, &quirks, &base));
                 json_reply(200, &session)
             }
@@ -182,6 +214,16 @@ pub(crate) async fn handle(
         ["jmap", "api"] => match method {
             HttpMethod::Post => {
                 let body = req.body.clone().unwrap_or_default();
+                if !auth.masked_email() && uses_masked_email(&body) {
+                    let problem = api::RequestError::UnknownCapability(format!(
+                        "{MASKED} was not granted to this token"
+                    ));
+                    return response(
+                        400,
+                        "application/problem+json",
+                        problem.to_problem().to_string(),
+                    );
+                }
                 let result =
                     server.commit(|store| api::process(store, &server.inner.quirks, &body));
                 let lose = {
@@ -463,12 +505,19 @@ mod tests {
                 .unwrap_or_default(),
             body: None,
         };
-        assert!(authorized(&req(Some("Bearer t")), "t"));
-        assert!(authorized(&req(Some("bearer t")), "t"));
-        assert!(!authorized(&req(Some("Bearer x")), "t"));
-        assert!(!authorized(&req(Some("Basic t")), "t"));
-        assert!(!authorized(&req(Some("Bearer")), "t"));
-        assert!(!authorized(&req(Some("Bearer ")), ""));
-        assert!(!authorized(&req(None), "t"));
+        assert_eq!(bearer(&req(Some("Bearer t"))), Some("t"));
+        assert_eq!(bearer(&req(Some("bearer t"))), Some("t"));
+        assert_eq!(bearer(&req(Some("Bearer  t "))), Some("t"));
+        assert_eq!(bearer(&req(Some("Basic t"))), None);
+        assert_eq!(bearer(&req(Some("Bearer"))), None);
+        assert_eq!(bearer(&req(Some("Bearer "))), None);
+        assert_eq!(bearer(&req(None)), None);
+        assert!(uses_masked_email(
+            br#"{"using":["urn:ietf:params:jmap:core","https://www.fastmail.com/dev/maskedemail"]}"#
+        ));
+        assert!(!uses_masked_email(
+            br#"{"using":["urn:ietf:params:jmap:core"]}"#
+        ));
+        assert!(!uses_masked_email(b"nope"));
     }
 }

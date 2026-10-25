@@ -1,18 +1,20 @@
 //! `mejl doctor`: what mejl sees, in one screen.
 //!
-//! Prints the version, every path, the config check, each account's token
+//! Prints the version, every path, the config check, each account's login
 //! source, store sizes and lock state, and the terminal's capabilities. It
 //! never prints a token: only where one would come from. It does not run
-//! `token_command`, which might prompt or be slow.
+//! `token_command`, which might prompt or be slow. For an OAuth login it
+//! shows the client id's source, the granted scope and the stored expiry,
+//! and never refreshes: only the TUI and `mejl login` may.
 
 use std::io::{self, Write};
 use std::path::Path;
 
 use crate::config::{AccountConfig, ConfigError, Loaded};
-use crate::env::{Env, var};
+use crate::env::Env;
 use crate::lock;
 use crate::paths::{ACCOUNTS_DIR, Paths};
-use crate::secrets::SecretStore;
+use crate::secrets::{LoginSource, SecretStore, login_source};
 use crate::terminal::probe::{Background, Capabilities, Multiplexer, ProbeStatus};
 
 /// The store files mejl-store keeps in an account folder.
@@ -125,20 +127,65 @@ fn account_section(
         "username",
         account.username.as_deref().unwrap_or("(not set)"),
     )?;
-    let token = if input.env.non_empty(var::MEJL_TOKEN).is_some() {
-        "from MEJL_TOKEN (set in the environment)".to_owned()
-    } else if account.token_command.is_some() {
-        "from token_command (not run by doctor)".to_owned()
-    } else {
-        match input.store.get(&account.name) {
-            Ok(Some(_)) => format!("found in the {}", input.store.describe()),
-            Ok(None) => "not found; run `mejl login`".to_owned(),
-            Err(e) => format!("cannot check: {e}"),
+    let found = login_source(account, input.env, input.store);
+    let login = match &found {
+        Ok(Some(LoginSource::Env)) => {
+            "API token from MEJL_TOKEN (set in the environment)".to_owned()
         }
+        Ok(Some(LoginSource::Command)) => {
+            "API token from token_command (not run by doctor)".to_owned()
+        }
+        Ok(Some(LoginSource::Store(_))) => {
+            format!("API token, found in the {}", input.store.describe())
+        }
+        Ok(Some(LoginSource::OAuth(_))) => {
+            format!("OAuth, found in the {}", input.store.describe())
+        }
+        Ok(None) => "not found; run `mejl login`".to_owned(),
+        Err(e) => format!("cannot check: {e}"),
     };
-    row(out, "token", &token)?;
+    row(out, "login", &login)?;
+    if let Ok(Some(LoginSource::OAuth(record))) = &found {
+        row(out, "client id", record.client_source.describe())?;
+        row(out, "issuer", &record.issuer)?;
+        let scope = if record.tokens.scope.is_empty() {
+            "(the server did not say)".to_owned()
+        } else {
+            record.tokens.scope.join(" ")
+        };
+        row(out, "scope", &scope)?;
+        row(
+            out,
+            "expires",
+            &expiry(record.tokens.expires_at, jiff::Timestamp::now()),
+        )?;
+    }
+    if account.oauth_client_id.is_some() && account.token_command.is_some() {
+        row(
+            out,
+            "note",
+            "oauth_client_id is not used while token_command is set",
+        )?;
+    }
     store_rows(&input.paths.account_dir(&account.name), out)?;
     writeln!(out)
+}
+
+/// When the stored access token expires, in plain words. mejl refreshes it
+/// on its own, so an expired one is not a problem.
+fn expiry(at: jiff::Timestamp, now: jiff::Timestamp) -> String {
+    let secs = at.as_second() - now.as_second();
+    let stamp = at.strftime("%Y-%m-%d %H:%M UTC");
+    if secs <= 0 {
+        return format!("{stamp} (expired; mejl refreshes it when it starts)");
+    }
+    let left = match secs {
+        s if s < 120 => format!("{s} seconds"),
+        s if s < 2 * 3600 => format!("{} minutes", s / 60),
+        s if s < 2 * 86_400 => format!("{} hours", s / 3600),
+        s => format!("{} days", s / 86_400),
+    };
+    format!("{stamp} (in {left}; mejl refreshes it before then)")
 }
 
 fn store_rows(dir: &Path, out: &mut dyn Write) -> io::Result<()> {
@@ -290,6 +337,7 @@ fn yes_no(b: bool) -> &'static str {
 mod tests {
     use super::*;
     use crate::config::parse;
+    use crate::env::var;
     use crate::secrets::MemoryStore;
     use crate::terminal::probe::from_env;
     use mejl_jmap::Secret;
@@ -331,8 +379,57 @@ mod tests {
         assert!(!outcome.config_errors);
 
         let (text, _) = run(&paths, &Env::default(), Ok(&loaded), &store);
-        assert!(text.contains("found in the memory store"), "{text}");
+        assert!(
+            text.contains("API token, found in the memory store"),
+            "{text}"
+        );
         assert!(!text.contains("keyring-secret"), "{text}");
+    }
+
+    #[test]
+    fn an_oauth_login_shows_scope_and_expiry_but_no_token() {
+        let base = tempfile::tempdir().unwrap();
+        let paths = Paths::under(base.path());
+        let store = MemoryStore::new();
+        store
+            .set("default", &Secret::new("fmu1-keyring-secret-value-5678"))
+            .unwrap();
+        let record = crate::oauth::OAuthRecord {
+            client_id: "doctor-client-id".into(),
+            client_source: crate::oauth::ClientSource::Registered,
+            issuer: "https://api.example.com".into(),
+            token_endpoint: "https://api.example.com/oauth/refresh".into(),
+            revocation_endpoint: None,
+            tokens: mejl_jmap::TokenSet {
+                access: Secret::new("doctor-access-secret-0001"),
+                refresh: Secret::new("doctor-refresh-secret-0001"),
+                expires_at: jiff::Timestamp::now() + jiff::SignedDuration::from_mins(30),
+                scope: vec![
+                    "urn:ietf:params:oauth:scope:mail".into(),
+                    "offline_access".into(),
+                ],
+            },
+        };
+        store.set_oauth("default", &record).unwrap();
+        let loaded = parse("").unwrap();
+        let (text, _) = run(&paths, &Env::default(), Ok(&loaded), &store);
+        assert!(text.contains("OAuth, found in the memory store"), "{text}");
+        assert!(text.contains("registered by `mejl login`"), "{text}");
+        assert!(
+            text.contains("scope           urn:ietf:params:oauth:scope:mail offline_access"),
+            "{text}"
+        );
+        assert!(
+            text.contains("(in 29 minutes") || text.contains("(in 30 minutes"),
+            "{text}"
+        );
+        for secret in ["doctor-access", "doctor-refresh", "keyring-secret"] {
+            assert!(!text.contains(secret), "{secret}: {text}");
+        }
+        assert_eq!(
+            expiry(jiff::Timestamp::UNIX_EPOCH, jiff::Timestamp::now()),
+            "1970-01-01 00:00 UTC (expired; mejl refreshes it when it starts)"
+        );
     }
 
     #[test]

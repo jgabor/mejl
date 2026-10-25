@@ -1557,6 +1557,7 @@ impl AppState {
             }
             Msg::Toast { text, level } => self.notify(text, level, false, cmds),
             Msg::Error(text) => self.notify(text, ToastLevel::Error, false, cmds),
+            Msg::MaskedAccess(note) => self.masked_unavailable = note,
             Msg::Outbox(report) => {
                 if let OutboxOutcome::Failed { error } = report.outcome {
                     self.notify(

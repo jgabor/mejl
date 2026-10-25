@@ -14,7 +14,7 @@ use futures::Stream;
 use futures::stream::FusedStream;
 use serde_json::Value;
 
-use crate::client::{Client, absolute_url, check_status};
+use crate::client::{Client, absolute_url, base_headers, check_status, set_bearer};
 use crate::error::Error;
 use crate::sse::{SseEvent, SseParser, SseTooLarge};
 use crate::template;
@@ -289,24 +289,36 @@ impl Client {
     /// `eventSourceUrl` and return its event stream.
     ///
     /// Connection problems and HTTP errors (401, 429 with `Retry-After`,
-    /// and so on) come back here, before any event. The stream has no
+    /// and so on) come back here, before any event. On an OAuth client a
+    /// 401 gets one refresh and one reconnect first. The stream has no
     /// overall timeout.
     pub async fn push(&self, options: &PushOptions) -> Result<PushStream, Error> {
         let session = self.session().ok_or(Error::NoSession)?;
         let url = event_source_url(self.session_url(), &session.event_source_url, options)?;
-        let mut headers = self.base_headers();
+        // The token is taken at each connect, so a reconnect after a
+        // refresh uses the new one.
+        let (token, provider) = self.bearer().await?;
+        let mut headers = base_headers(&token);
         headers.push(("accept".into(), "text/event-stream".into()));
         headers.push(("cache-control".into(), "no-cache".into()));
         if let Some(id) = options.last_event_id.as_deref().filter(|id| !id.is_empty()) {
             headers.push(("last-event-id".into(), id.to_owned()));
         }
-        let req = HttpRequest {
+        let mut req = HttpRequest {
             method: HttpMethod::Get,
             url,
             headers,
             body: None,
         };
-        let resp = self.inner.transport.stream(req).await?;
+        let mut resp = self.inner.transport.stream(req.clone()).await?;
+        if resp.status == 401
+            && let Some(provider) = provider
+        {
+            drop(resp);
+            let fresh = provider.renew(&token).await?;
+            set_bearer(&mut req.headers, &fresh);
+            resp = self.inner.transport.stream(req).await?;
+        }
         // The body of an error response is a stream that might never end,
         // so it is not read.
         check_status(resp.status, &resp.headers, &[])?;
@@ -617,7 +629,7 @@ mod tests {
         }
         assert!(matches!(
             block_on(client.push(&PushOptions::default())),
-            Err(Error::Unauthorized { .. })
+            Err(Error::Unauthorized { status: 401, .. })
         ));
         match block_on(client.push(&PushOptions::default())) {
             Err(e) => assert_eq!(e.retry_after(), Some(Duration::from_secs(30))),

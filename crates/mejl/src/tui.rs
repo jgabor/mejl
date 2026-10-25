@@ -33,6 +33,7 @@ use crate::config::Config;
 use crate::env::{Env, var};
 use crate::events::{self, LoopEvent};
 use crate::input::InputThread;
+use crate::oauth::OAuthSession;
 use crate::terminal::editor::EditorCommand;
 use crate::terminal::probe::{self, Support};
 use crate::terminal::signals::SignalWatcher;
@@ -57,6 +58,8 @@ pub struct Launch {
     pub store_dir: PathBuf,
     /// The JMAP client with the token.
     pub client: Client,
+    /// The OAuth login inside `client`, when it has one.
+    pub oauth: Option<OAuthSession>,
     /// The loaded config.
     pub config: Config,
     /// Where setting changes are written.
@@ -132,6 +135,14 @@ pub fn run_with_caps_cache(
     let store = Store::open(&launch.store_dir, store_options(&launch.config))
         .map_err(|e| failure("cannot open the local store", e))?;
     let (tx, rx) = events::channel::<AppEvent>();
+    if let Some(oauth) = &launch.oauth {
+        // Hooked up before the engine starts, so its first refresh is
+        // covered.
+        let save_tx = tx.clone();
+        oauth.store.on_save_error(move |why| {
+            let _ = save_tx.msg(AppEvent::LoginNotSaved(why));
+        });
+    }
     let sink_tx = tx.clone();
     let handle = Engine::start(launch.engine, launch.client.clone(), store, move |e| {
         let _ = sink_tx.msg(AppEvent::Sync(e));
@@ -163,6 +174,7 @@ pub fn run_with_caps_cache(
             tx,
             handle: handle.clone(),
             client: launch.client,
+            oauth: launch.oauth.map(|o| o.credentials),
         },
         &rx,
     );
@@ -187,6 +199,7 @@ struct Inside<'a> {
     // The engine has its own clone; they share the session, which the app
     // needs for attachment downloads.
     client: Client,
+    oauth: Option<mejl_jmap::OAuthCredentials>,
 }
 
 fn run_inside(inside: Inside<'_>, rx: &events::LoopReceiver<AppEvent>) -> Result<Report, CliError> {
@@ -200,6 +213,7 @@ fn run_inside(inside: Inside<'_>, rx: &events::LoopReceiver<AppEvent>) -> Result
         tx,
         handle,
         client,
+        oauth,
     } = inside;
     let input =
         InputThread::spawn(tx.clone()).map_err(|e| failure("cannot read the terminal", e))?;
@@ -220,6 +234,8 @@ fn run_inside(inside: Inside<'_>, rx: &events::LoopReceiver<AppEvent>) -> Result
         host: Box::new(host),
         handle,
         client,
+        oauth,
+        lock_retry: crate::app::LOCK_RETRY,
         tx,
         settings,
         ui,

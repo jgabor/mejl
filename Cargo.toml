@@ -70,6 +70,8 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tracing-appender = "0.2.5"
 open = "5.4.5"
 sha2 = "0.10"
+base64 = "0.22"
+getrandom = "0.4"
 libc = "0.2"
 signal-hook = "0.3"
 

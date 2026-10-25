@@ -1,16 +1,23 @@
-//! API token storage.
+//! Login storage: API tokens and OAuth logins.
 //!
-//! Tokens live in the OS keyring under service [`KEYRING_SERVICE`], one
-//! entry per account name. They are held in memory as
+//! Both live in the OS keyring under service [`KEYRING_SERVICE`]. An API
+//! token's entry is named after the account; an OAuth login's entry is
+//! `<account>:oauth` and holds an [`OAuthRecord`]. A `:` cannot appear in
+//! an account name, so the two never collide. Secrets are held in memory as
 //! [`mejl_jmap::Secret`], whose `Debug` and `Display` print `[redacted]`,
 //! and each one is registered with the log redactor as soon as it is read.
 //!
-//! Where a token comes from, first match wins ([`resolve_token`]):
+//! Where the login comes from, first match wins ([`login_source`] and
+//! [`resolve_login`]):
 //!
 //! 1. `MEJL_TOKEN` in the environment, for scripted use. It applies to the
 //!    selected account and is never written anywhere.
 //! 2. The account's `token_command`, for systems without a keyring.
-//! 3. The keyring entry that `mejl login` wrote.
+//! 3. The OAuth login that `mejl login` stored.
+//! 4. The API token that `mejl login` stored.
+//!
+//! An account has one stored login at a time: an OAuth login removes the
+//! stored token, and a token login removes the OAuth login.
 //!
 //! Tests use [`MemoryStore`]. Nothing in a test may build a
 //! [`KeyringStore`]: the first keyring call connects to the real Secret
@@ -24,11 +31,20 @@ use mejl_jmap::Secret;
 
 use crate::config::AccountConfig;
 use crate::env::{Env, var};
+use crate::oauth::OAuthRecord;
 
 /// The keyring service name.
 pub const KEYRING_SERVICE: &str = "mejl";
 /// The longest token accepted. Fastmail tokens are far shorter.
 pub const MAX_TOKEN_LEN: usize = 4096;
+/// The longest stored OAuth login accepted. It holds two tokens and a few
+/// URLs.
+pub const MAX_RECORD_LEN: usize = 16 * 1024;
+
+/// The keyring user name of an account's OAuth login.
+pub fn oauth_entry(account: &str) -> String {
+    format!("{account}:oauth")
+}
 
 /// Failures of a secret store. Messages never contain the secret.
 #[derive(Debug, thiserror::Error)]
@@ -47,7 +63,8 @@ pub enum SecretError {
     Other(String),
 }
 
-/// A place tokens are kept, one per account name.
+/// A place logins are kept: one API token and one OAuth login per account
+/// name.
 pub trait SecretStore: Send + Sync {
     /// The token for an account, or `None` when there is none.
     fn get(&self, account: &str) -> Result<Option<Secret>, SecretError>;
@@ -55,6 +72,12 @@ pub trait SecretStore: Send + Sync {
     fn set(&self, account: &str, token: &Secret) -> Result<(), SecretError>;
     /// Removes the token. Returns whether one existed.
     fn delete(&self, account: &str) -> Result<bool, SecretError>;
+    /// The OAuth login for an account, or `None` when there is none.
+    fn get_oauth(&self, account: &str) -> Result<Option<OAuthRecord>, SecretError>;
+    /// Stores or replaces the OAuth login for an account.
+    fn set_oauth(&self, account: &str, record: &OAuthRecord) -> Result<(), SecretError>;
+    /// Removes the OAuth login. Returns whether one existed.
+    fn delete_oauth(&self, account: &str) -> Result<bool, SecretError>;
     /// A short name for messages, such as "OS keyring".
     fn describe(&self) -> &'static str;
 }
@@ -126,11 +149,25 @@ impl SecretStore for KeyringStore {
     }
 
     fn delete(&self, account: &str) -> Result<bool, SecretError> {
-        match self.entry(account)?.delete_credential() {
-            Ok(()) => Ok(true),
-            Err(keyring::Error::NoEntry) => Ok(false),
+        delete_entry(&self.entry(account)?)
+    }
+
+    fn get_oauth(&self, account: &str) -> Result<Option<OAuthRecord>, SecretError> {
+        match self.entry(&oauth_entry(account))?.get_password() {
+            Ok(value) => parse_record(&value).map(Some),
+            Err(keyring::Error::NoEntry) => Ok(None),
             Err(e) => Err(map_keyring_error(e)),
         }
+    }
+
+    fn set_oauth(&self, account: &str, record: &OAuthRecord) -> Result<(), SecretError> {
+        self.entry(&oauth_entry(account))?
+            .set_password(record.to_json().expose())
+            .map_err(map_keyring_error)
+    }
+
+    fn delete_oauth(&self, account: &str) -> Result<bool, SecretError> {
+        delete_entry(&self.entry(&oauth_entry(account))?)
     }
 
     fn describe(&self) -> &'static str {
@@ -138,10 +175,30 @@ impl SecretStore for KeyringStore {
     }
 }
 
-/// An in-memory store for tests.
+fn delete_entry(entry: &keyring::Entry) -> Result<bool, SecretError> {
+    match entry.delete_credential() {
+        Ok(()) => Ok(true),
+        Err(keyring::Error::NoEntry) => Ok(false),
+        Err(e) => Err(map_keyring_error(e)),
+    }
+}
+
+/// Checks a stored OAuth login's size, then parses it.
+fn parse_record(text: &str) -> Result<OAuthRecord, SecretError> {
+    if text.len() > MAX_RECORD_LEN {
+        return Err(SecretError::Corrupt(format!(
+            "the stored OAuth login is longer than {MAX_RECORD_LEN} bytes"
+        )));
+    }
+    OAuthRecord::from_json(text)
+}
+
+/// An in-memory store for tests. OAuth logins are kept as the same JSON
+/// text the keyring gets.
 #[derive(Debug, Default)]
 pub struct MemoryStore {
     tokens: Mutex<HashMap<String, String>>,
+    records: Mutex<HashMap<String, String>>,
     fail_with: Mutex<Option<String>>,
 }
 
@@ -196,6 +253,36 @@ impl SecretStore for MemoryStore {
         self.check()?;
         Ok(self
             .tokens
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(account)
+            .is_some())
+    }
+
+    fn get_oauth(&self, account: &str) -> Result<Option<OAuthRecord>, SecretError> {
+        self.check()?;
+        let text = self
+            .records
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(account)
+            .cloned();
+        text.map(|t| parse_record(&t)).transpose()
+    }
+
+    fn set_oauth(&self, account: &str, record: &OAuthRecord) -> Result<(), SecretError> {
+        self.check()?;
+        self.records
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(account.to_owned(), record.to_json().expose().to_owned());
+        Ok(())
+    }
+
+    fn delete_oauth(&self, account: &str) -> Result<bool, SecretError> {
+        self.check()?;
+        Ok(self
+            .records
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .remove(account)
@@ -258,26 +345,80 @@ impl TokenSource {
     }
 }
 
-/// Finds the token for an account. Returns `Ok(None)` when no source has
-/// one. Every token found is registered with the log redactor.
-pub fn resolve_token(
+/// Which login source wins for an account, found without running
+/// `token_command`. Sources after the winner are not looked at, so with
+/// `MEJL_TOKEN` set the keyring is never read.
+#[derive(Debug)]
+pub enum LoginSource {
+    /// `MEJL_TOKEN` is set.
+    Env,
+    /// The account has a `token_command`.
+    Command,
+    /// A stored OAuth login.
+    OAuth(Box<OAuthRecord>),
+    /// A stored API token.
+    Store(Secret),
+}
+
+/// Finds which source has the login for an account, without running
+/// `token_command` and without registering anything. `Ok(None)` when no
+/// source has one. `mejl doctor` uses this; [`resolve_login`] builds on it.
+pub fn login_source(
     account: &AccountConfig,
     env: &Env,
     store: &dyn SecretStore,
-) -> Result<Option<(Secret, TokenSource)>, SecretError> {
-    let found = if let Some(raw) = env.get(var::MEJL_TOKEN).filter(|v| !v.trim().is_empty()) {
-        let token =
-            check_token(raw).map_err(|e| SecretError::Corrupt(format!("MEJL_TOKEN: {e}")))?;
-        Some((token, TokenSource::Env))
-    } else if let Some(command) = account.token_command.as_deref() {
-        Some((run_token_command(command)?, TokenSource::Command))
-    } else {
-        store.get(&account.name)?.map(|t| (t, TokenSource::Store))
+) -> Result<Option<LoginSource>, SecretError> {
+    if env.non_empty(var::MEJL_TOKEN).is_some() {
+        return Ok(Some(LoginSource::Env));
+    }
+    if account.token_command.is_some() {
+        return Ok(Some(LoginSource::Command));
+    }
+    if let Some(record) = store.get_oauth(&account.name)? {
+        return Ok(Some(LoginSource::OAuth(Box::new(record))));
+    }
+    Ok(store.get(&account.name)?.map(LoginSource::Store))
+}
+
+/// A login, ready to use.
+#[derive(Debug)]
+pub enum Login {
+    /// An API token and where it came from.
+    Token(Secret, TokenSource),
+    /// A stored OAuth login.
+    OAuth(Box<OAuthRecord>),
+}
+
+/// Finds the login for an account, in the order of [`login_source`], and
+/// runs `token_command` when that wins. Returns `Ok(None)` when no source
+/// has one. Every token found is registered with the log redactor.
+pub fn resolve_login(
+    account: &AccountConfig,
+    env: &Env,
+    store: &dyn SecretStore,
+) -> Result<Option<Login>, SecretError> {
+    let found = match login_source(account, env, store)? {
+        None => return Ok(None),
+        Some(LoginSource::Env) => {
+            let raw = env.get(var::MEJL_TOKEN).unwrap_or_default();
+            let token =
+                check_token(raw).map_err(|e| SecretError::Corrupt(format!("MEJL_TOKEN: {e}")))?;
+            Login::Token(token, TokenSource::Env)
+        }
+        Some(LoginSource::Command) => {
+            let command = account.token_command.as_deref().unwrap_or_default();
+            Login::Token(run_token_command(command)?, TokenSource::Command)
+        }
+        Some(LoginSource::OAuth(record)) => {
+            record.register_secrets();
+            return Ok(Some(Login::OAuth(record)));
+        }
+        Some(LoginSource::Store(token)) => Login::Token(token, TokenSource::Store),
     };
-    if let Some((token, _)) = &found {
+    if let Login::Token(token, _) = &found {
         crate::logging::register_secret(token);
     }
-    Ok(found)
+    Ok(Some(found))
 }
 
 /// Runs a `token_command` through the shell and returns the first non-empty
@@ -371,18 +512,42 @@ mod tests {
         assert!(!shown.contains("secret"));
     }
 
+    fn token(login: Option<Login>) -> (String, TokenSource) {
+        match login {
+            Some(Login::Token(t, src)) => (t.expose().to_owned(), src),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    fn record() -> OAuthRecord {
+        OAuthRecord {
+            client_id: "client-1".into(),
+            client_source: crate::oauth::ClientSource::Registered,
+            issuer: "https://api.example.com".into(),
+            token_endpoint: "https://api.example.com/oauth/refresh".into(),
+            revocation_endpoint: None,
+            tokens: mejl_jmap::TokenSet {
+                access: Secret::new("oauth-access-0001"),
+                refresh: Secret::new("oauth-refresh-0001"),
+                expires_at: jiff::Timestamp::UNIX_EPOCH,
+                scope: Vec::new(),
+            },
+        }
+    }
+
     #[test]
     fn env_wins_over_command_and_store() {
         let store = MemoryStore::new();
         store.set("default", &Secret::new("from-store")).unwrap();
+        store.set_oauth("default", &record()).unwrap();
         let mut account = AccountConfig::named("default");
         let env = Env::default().with(var::MEJL_TOKEN, "from-env");
-        let (t, src) = resolve_token(&account, &env, &store).unwrap().unwrap();
-        assert_eq!((t.expose(), src), ("from-env", TokenSource::Env));
+        let found = resolve_login(&account, &env, &store).unwrap();
+        assert_eq!(token(found), ("from-env".into(), TokenSource::Env));
 
         account.token_command = Some("exit 3".into());
-        let (t, src) = resolve_token(&account, &env, &store).unwrap().unwrap();
-        assert_eq!((t.expose(), src), ("from-env", TokenSource::Env));
+        let found = resolve_login(&account, &env, &store).unwrap();
+        assert_eq!(token(found), ("from-env".into(), TokenSource::Env));
     }
 
     #[test]
@@ -391,10 +556,62 @@ mod tests {
         store.set("default", &Secret::new("from-store")).unwrap();
         let account = AccountConfig::named("default");
         let env = Env::default().with(var::MEJL_TOKEN, "  ");
-        let (t, src) = resolve_token(&account, &env, &store).unwrap().unwrap();
-        assert_eq!((t.expose(), src), ("from-store", TokenSource::Store));
+        let found = resolve_login(&account, &env, &store).unwrap();
+        assert_eq!(token(found), ("from-store".into(), TokenSource::Store));
         let other = AccountConfig::named("other");
-        assert!(resolve_token(&other, &env, &store).unwrap().is_none());
+        assert!(resolve_login(&other, &env, &store).unwrap().is_none());
+    }
+
+    #[test]
+    fn an_oauth_login_wins_over_a_stored_token() {
+        let store = MemoryStore::new();
+        store.set("default", &Secret::new("from-store")).unwrap();
+        store.set_oauth("default", &record()).unwrap();
+        let account = AccountConfig::named("default");
+        match resolve_login(&account, &Env::default(), &store).unwrap() {
+            Some(Login::OAuth(r)) => assert_eq!(*r, record()),
+            other => panic!("{other:?}"),
+        }
+        assert!(matches!(
+            login_source(&account, &Env::default(), &store).unwrap(),
+            Some(LoginSource::OAuth(_))
+        ));
+        // The source check never runs token_command.
+        let mut with_command = account.clone();
+        with_command.token_command = Some("exit 9".into());
+        assert!(matches!(
+            login_source(&with_command, &Env::default(), &store).unwrap(),
+            Some(LoginSource::Command)
+        ));
+        // With MEJL_TOKEN set, the store is not read at all.
+        store.fail_with(Some("locked"));
+        let env = Env::default().with(var::MEJL_TOKEN, "from-env");
+        assert!(matches!(
+            login_source(&account, &env, &store).unwrap(),
+            Some(LoginSource::Env)
+        ));
+        assert!(login_source(&account, &Env::default(), &store).is_err());
+    }
+
+    #[test]
+    fn memory_store_keeps_oauth_logins_apart_from_tokens() {
+        let store = MemoryStore::new();
+        assert!(store.get_oauth("a").unwrap().is_none());
+        store.set_oauth("a", &record()).unwrap();
+        store.set("a", &Secret::new("tok-1")).unwrap();
+        assert_eq!(store.get_oauth("a").unwrap().unwrap(), record());
+        assert!(store.delete("a").unwrap());
+        assert!(store.get_oauth("a").unwrap().is_some());
+        assert!(store.delete_oauth("a").unwrap());
+        assert!(!store.delete_oauth("a").unwrap());
+        assert_eq!(oauth_entry("work"), "work:oauth");
+        // A record over the size limit is refused without echoing it.
+        let mut big = record();
+        big.tokens.access = Secret::new("x".repeat(MAX_RECORD_LEN));
+        store.set_oauth("a", &big).unwrap();
+        let e = store.get_oauth("a").unwrap_err().to_string();
+        assert!(e.contains("longer than"), "{e}");
+        assert!(!e.contains("xxxx"), "{e}");
     }
 
     #[test]
@@ -402,7 +619,7 @@ mod tests {
         let store = MemoryStore::new();
         let account = AccountConfig::named("default");
         let env = Env::default().with(var::MEJL_TOKEN, "two words");
-        let err = resolve_token(&account, &env, &store)
+        let err = resolve_login(&account, &env, &store)
             .unwrap_err()
             .to_string();
         assert!(err.contains("MEJL_TOKEN"), "{err}");
@@ -416,10 +633,8 @@ mod tests {
         store.set("default", &Secret::new("from-store")).unwrap();
         let mut account = AccountConfig::named("default");
         account.token_command = Some("printf '\\n  tok-from-cmd  \\nsecond\\n'".into());
-        let (t, src) = resolve_token(&account, &Env::default(), &store)
-            .unwrap()
-            .unwrap();
-        assert_eq!((t.expose(), src), ("tok-from-cmd", TokenSource::Command));
+        let found = resolve_login(&account, &Env::default(), &store).unwrap();
+        assert_eq!(token(found), ("tok-from-cmd".into(), TokenSource::Command));
     }
 
     #[cfg(unix)]

@@ -71,9 +71,29 @@ impl Class {
     }
 }
 
+/// Whether an auth failure is an OAuth refresh refused with
+/// `temporary: true`, such as a locked account.
+pub(crate) fn is_temporary_auth(err: &JmapError) -> bool {
+    err.oauth_error().is_some_and(|e| e.temporary)
+}
+
+impl SyncError {
+    /// [`is_temporary_auth`] for an engine error.
+    pub(crate) fn is_temporary_auth(&self) -> bool {
+        match self {
+            SyncError::Jmap(e) => is_temporary_auth(e),
+            _ => false,
+        }
+    }
+}
+
 pub(crate) fn classify_jmap(err: &JmapError) -> Class {
     match err {
-        JmapError::Unauthorized { .. } => Class::Auth,
+        // A 401 or 403, or an OAuth refresh that was refused or lost. A
+        // refresh that only hit a passing server problem is transient.
+        e if e.is_unauthorized() => Class::Auth,
+        JmapError::InvalidOAuth(_) => Class::Auth,
+        JmapError::OAuth(_) => Class::Transient,
         JmapError::Http { status: 403, .. } => Class::Auth,
         JmapError::Transport(_) => Class::Network,
         JmapError::RateLimited { retry_after } | JmapError::ServiceUnavailable { retry_after } => {
@@ -145,8 +165,25 @@ mod tests {
     fn classes() {
         assert_eq!(
             classify_jmap(&JmapError::Unauthorized {
+                status: 401,
                 www_authenticate: None
             }),
+            Class::Auth
+        );
+        let oauth = |kind: mejl_jmap::OAuthErrorKind| {
+            JmapError::OAuth(Box::new(mejl_jmap::OAuthError::new(kind)))
+        };
+        assert_eq!(
+            classify_jmap(&oauth(mejl_jmap::OAuthErrorKind::InvalidGrant)),
+            Class::Auth
+        );
+        assert_eq!(
+            classify_jmap(&oauth(mejl_jmap::OAuthErrorKind::TemporarilyUnavailable)),
+            Class::Transient
+        );
+        assert_eq!(classify_jmap(&JmapError::RefreshLost), Class::Auth);
+        assert_eq!(
+            classify_jmap(&JmapError::InvalidOAuth("bad".into())),
             Class::Auth
         );
         assert_eq!(

@@ -150,6 +150,7 @@ Fixed, each with tests:
 - Reader side-panel rows, the search filter block, Masked Email silent and created-by filters (keys `5`, `6`) and the rules "where the block runs" section (at 160x40 only) follow the mock-ups.
 - New setting `ui.mark_read_on_archive` (off by default).
 - Custom key presets with an in-app key editor (settings, Enter on Keys): duplicate a built-in preset, rebind each command, swap or replace on a clash. A preset stores its base and its changes only (`[presets.<name>]`).
+- OAuth login (`mejl login --oauth`): discovery, open dynamic registration (or `oauth_client_id`), PKCE S256 with a `127.0.0.1` loopback redirect, `iss` check, refresh tokens that rotate and are never reused, and revoke on logout. Built and tested against the fake only. A live login answers open questions 3 and 17; it registers a client on Fastmail's servers, so the user runs it.
 - Macros (`[macros.<name>]`): several changes to mail on one key, sent as one change with one undo, built in the key editor's Macros section.
 
 Not done:

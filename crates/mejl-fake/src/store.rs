@@ -37,6 +37,14 @@ impl Clock {
         self.ticks += 1;
         t
     }
+
+    /// The current time without moving the clock, so a check that runs on
+    /// every request does not shift the timestamps of later objects.
+    pub(crate) fn peek(&self) -> Timestamp {
+        self.base
+            .checked_add(SignedDuration::from_secs(self.ticks))
+            .unwrap_or(self.base)
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

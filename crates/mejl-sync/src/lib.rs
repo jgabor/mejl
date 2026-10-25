@@ -28,7 +28,8 @@
 //!
 //! - Session: fetched at start and again when a response reports a new
 //!   `sessionState`. 401 and 403 stop all network work and send
-//!   [`SyncEvent::AuthFailed`] until [`Command::SetToken`].
+//!   [`SyncEvent::AuthFailed`] until [`Command::SetToken`] or
+//!   [`Command::ResumeAuth`].
 //! - First sync: mailboxes, identities and contacts, then the Inbox window
 //!   so it is readable first, then the other role mailboxes.
 //! - Later syncs: `/changes` for every type and `Email/queryChanges` for

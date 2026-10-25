@@ -22,6 +22,12 @@ pub enum Command {
     /// [`SyncEvent::AuthFailed`](crate::SyncEvent::AuthFailed) came. Resumes
     /// all network work.
     SetToken(Secret),
+    /// Try again with the credentials the client has now, after
+    /// [`SyncEvent::AuthFailed`](crate::SyncEvent::AuthFailed). For an OAuth
+    /// login the caller resets the client first with
+    /// [`Client::set_oauth`](mejl_jmap::Client::set_oauth). Resumes all
+    /// network work.
+    ResumeAuth,
     /// Queue a store mutation the caller built. Answers with
     /// [`SyncEvent::Applied`](crate::SyncEvent::Applied) or
     /// [`SyncEvent::Rejected`](crate::SyncEvent::Rejected).

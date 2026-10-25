@@ -185,6 +185,89 @@ impl RequestError {
     }
 }
 
+string_enum! {
+    /// OAuth error codes: RFC 6749 sections 4.1.2.1 and 5.2, RFC 7591
+    /// section 3.2.2 and RFC 7009 section 2.2.1.
+    pub enum OAuthErrorKind {
+        InvalidRequest => "invalid_request",
+        InvalidClient => "invalid_client",
+        InvalidGrant => "invalid_grant",
+        UnauthorizedClient => "unauthorized_client",
+        UnsupportedGrantType => "unsupported_grant_type",
+        UnsupportedResponseType => "unsupported_response_type",
+        UnsupportedTokenType => "unsupported_token_type",
+        InvalidScope => "invalid_scope",
+        AccessDenied => "access_denied",
+        ServerError => "server_error",
+        TemporarilyUnavailable => "temporarily_unavailable",
+        InvalidRedirectUri => "invalid_redirect_uri",
+        InvalidClientMetadata => "invalid_client_metadata",
+        @other Other,
+    }
+}
+
+/// An OAuth error response, from a token, registration or revocation
+/// endpoint or from the authorization redirect.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error(
+    "OAuth error {error}{}{}",
+    .description.as_deref().map(|d| format!(": {d}")).unwrap_or_default(),
+    if *.temporary { " (temporary)" } else { "" }
+)]
+pub struct OAuthError {
+    /// The `error` code.
+    pub error: OAuthErrorKind,
+    /// The `error_description`, when the server gave one.
+    pub description: Option<String>,
+    /// Fastmail's `temporary` member on `invalid_grant`: the login is
+    /// blocked for now, for example by an admin lock, but not revoked.
+    pub temporary: bool,
+}
+
+impl OAuthError {
+    /// An error with no description.
+    pub fn new(error: OAuthErrorKind) -> Self {
+        Self {
+            error,
+            description: None,
+            temporary: false,
+        }
+    }
+
+    /// Parse an error body. Only a JSON object with a string `error` is
+    /// accepted. `temporary` may be a boolean or the string `"true"`.
+    pub fn from_body(body: &[u8]) -> Option<Self> {
+        let value: serde_json::Value = serde_json::from_slice(body).ok()?;
+        let error = value.get("error")?.as_str()?;
+        if error.is_empty() {
+            return None;
+        }
+        let temporary = match value.get("temporary") {
+            Some(serde_json::Value::Bool(b)) => *b,
+            Some(serde_json::Value::String(s)) => s.eq_ignore_ascii_case("true"),
+            _ => false,
+        };
+        Some(Self {
+            error: OAuthErrorKind::from(error),
+            description: value
+                .get("error_description")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned),
+            temporary,
+        })
+    }
+
+    /// Whether the same request may work later: the server had a problem.
+    /// A `temporary` `invalid_grant` is not transient here: the login is
+    /// blocked until something outside mejl changes.
+    pub fn is_transient(&self) -> bool {
+        matches!(
+            self.error,
+            OAuthErrorKind::ServerError | OAuthErrorKind::TemporarilyUnavailable
+        )
+    }
+}
+
 /// Anything that can go wrong talking to a JMAP server.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -197,11 +280,29 @@ pub enum Error {
     InvalidUrl { url: String, reason: String },
     /// HTTP 401 or 403. The token is wrong, expired, revoked or lacks a
     /// scope.
-    #[error("not authorized")]
+    #[error("not authorized (HTTP {status})")]
     Unauthorized {
+        /// 401 for a token the server does not accept, which an OAuth
+        /// client answers with a refresh. 403 for a token that lacks a
+        /// scope or was revoked, which a refresh does not fix.
+        status: u16,
         /// The `WWW-Authenticate` header, which points at OAuth metadata.
         www_authenticate: Option<String>,
     },
+    /// The OAuth server refused a request with an RFC 6749 error, such as
+    /// `invalid_grant` for a refresh token that no longer works.
+    #[error(transparent)]
+    OAuth(Box<OAuthError>),
+    /// A token refresh got no usable response twice in a row. The refresh
+    /// token may have been used up, so the login has to be renewed.
+    #[error("the OAuth token refresh got no response")]
+    RefreshLost,
+    /// OAuth metadata, a registration or a token response mejl cannot use.
+    #[error("unusable OAuth response: {0}")]
+    InvalidOAuth(String),
+    /// The system's random number source failed.
+    #[error("cannot get random bytes: {0}")]
+    Random(String),
     /// HTTP 429.
     #[error("rate limited")]
     RateLimited { retry_after: Option<Duration> },
@@ -268,9 +369,24 @@ impl Error {
         }
     }
 
-    /// Whether the credentials were rejected.
+    /// Whether the credentials were rejected: a 401 or 403, an OAuth error
+    /// other than a passing server problem, or a refresh that got no
+    /// response. Each needs new credentials.
     pub fn is_unauthorized(&self) -> bool {
-        matches!(self, Error::Unauthorized { .. })
+        match self {
+            Error::Unauthorized { .. } | Error::RefreshLost => true,
+            Error::OAuth(e) => !e.is_transient(),
+            _ => false,
+        }
+    }
+
+    /// The OAuth error, if this is one. Its `temporary` flag tells a
+    /// passing lock from a revoked login.
+    pub fn oauth_error(&self) -> Option<&OAuthError> {
+        match self {
+            Error::OAuth(e) => Some(e),
+            _ => None,
+        }
     }
 
     /// Whether the same request may succeed later without changes: network
@@ -281,6 +397,7 @@ impl Error {
             Error::RateLimited { .. } | Error::ServiceUnavailable { .. } => true,
             Error::Http { status, .. } => *status >= 500,
             Error::Method { error, .. } => error.is_transient(),
+            Error::OAuth(e) => e.is_transient(),
             _ => false,
         }
     }
@@ -464,6 +581,37 @@ mod tests {
     }
 
     #[test]
+    fn oauth_error_bodies() {
+        let e = OAuthError::from_body(
+            br#"{"error":"invalid_grant","error_description":"Account locked","temporary":true}"#,
+        )
+        .unwrap();
+        assert_eq!(e.error, OAuthErrorKind::InvalidGrant);
+        assert_eq!(e.description.as_deref(), Some("Account locked"));
+        assert!(e.temporary);
+        assert_eq!(
+            e.to_string(),
+            "OAuth error invalid_grant: Account locked (temporary)"
+        );
+        let e = OAuthError::from_body(br#"{"error":"invalid_grant"}"#).unwrap();
+        assert!(!e.temporary);
+        assert_eq!(e.to_string(), "OAuth error invalid_grant");
+        let e = OAuthError::from_body(br#"{"error":"invalid_grant","temporary":"true"}"#).unwrap();
+        assert!(e.temporary);
+        let e = OAuthError::from_body(br#"{"error":"slow_down"}"#).unwrap();
+        assert_eq!(e.error, OAuthErrorKind::Other("slow_down".into()));
+        assert!(
+            OAuthError::from_body(br#"{"error":"temporarily_unavailable"}"#)
+                .unwrap()
+                .is_transient()
+        );
+        assert!(OAuthError::from_body(b"<html>").is_none());
+        assert!(OAuthError::from_body(br#"{"error":7}"#).is_none());
+        assert!(OAuthError::from_body(br#"{"error":""}"#).is_none());
+        assert!(OAuthError::from_body(br#"{"type":"about:blank"}"#).is_none());
+    }
+
+    #[test]
     fn snippet_cuts_at_char_boundary() {
         assert_eq!(body_snippet(b"short", 10), "short");
         let s = body_snippet("ééé".as_bytes(), 3);
@@ -489,10 +637,21 @@ mod tests {
         );
         assert!(
             Error::Unauthorized {
+                status: 401,
                 www_authenticate: None
             }
             .is_unauthorized()
         );
+        assert!(Error::RefreshLost.is_unauthorized());
+        let grant = Error::OAuth(Box::new(OAuthError::new(OAuthErrorKind::InvalidGrant)));
+        assert!(grant.is_unauthorized());
+        assert!(!grant.is_transient());
+        let busy = Error::OAuth(Box::new(OAuthError::new(
+            OAuthErrorKind::TemporarilyUnavailable,
+        )));
+        assert!(!busy.is_unauthorized());
+        assert!(busy.is_transient());
+        assert!(!Error::InvalidOAuth("x".into()).is_unauthorized());
         let e = Error::Method {
             call_id: "c0".into(),
             name: "Email/changes".into(),

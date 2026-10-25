@@ -135,6 +135,8 @@ impl Harness {
             host: Box::new(RecordingHost::default()),
             handle,
             client,
+            oauth: None,
+            lock_retry: mejl::app::LOCK_RETRY,
             tx,
             settings,
             ui,

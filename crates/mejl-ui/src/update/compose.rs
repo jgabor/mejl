@@ -293,7 +293,11 @@ impl AppState {
                 }
             }
             Action::PickFrom => self.open_from_picker(data),
-            Action::NewMaskFrom => self.new_mask_for_compose(),
+            Action::NewMaskFrom => {
+                if !self.masks_refused(cmds) {
+                    self.new_mask_for_compose();
+                }
+            }
             _ => return false,
         }
         true

@@ -809,6 +809,9 @@ pub struct AppState {
     pub(crate) search: Option<Box<SearchState>>,
     pub(crate) results: Option<Box<ResultsList>>,
     pub(crate) masked: Option<Box<MaskedScreen>>,
+    /// Why this login cannot use Masked Email, from
+    /// [`Msg::MaskedAccess`](crate::Msg::MaskedAccess). `None` while it can.
+    pub(crate) masked_unavailable: Option<String>,
     pub(crate) rules: Option<Box<RulesScreen>>,
     pub(crate) settings: Option<SettingsScreen>,
     pub(crate) keys: Option<Box<crate::keys_screen::KeysScreen>>,
@@ -862,6 +865,7 @@ impl AppState {
             search: None,
             results: None,
             masked: None,
+            masked_unavailable: None,
             rules: None,
             settings: None,
             keys: None,

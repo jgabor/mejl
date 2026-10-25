@@ -322,7 +322,10 @@ async fn wrong_token_is_unauthorized() {
     let servers = start().await;
     let client = client(&servers.base, "/jmap/session", "wrong");
     match client.fetch_session().await {
-        Err(Error::Unauthorized { www_authenticate }) => {
+        Err(Error::Unauthorized {
+            status: 401,
+            www_authenticate,
+        }) => {
             assert_eq!(www_authenticate.as_deref(), Some("Bearer realm=\"test\""));
         }
         other => panic!("expected 401, got {other:?}"),

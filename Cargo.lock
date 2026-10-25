@@ -2120,6 +2120,7 @@ name = "mejl-fake"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "base64 0.22.1",
  "bytes",
  "futures",
  "jiff",
@@ -2127,6 +2128,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tokio",
  "tracing",
 ]
@@ -2136,12 +2138,15 @@ name = "mejl-jmap"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "base64 0.22.1",
  "bytes",
  "futures",
+ "getrandom 0.4.3",
  "jiff",
  "reqwest",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "thiserror 2.0.21",
  "tokio",
  "tracing",

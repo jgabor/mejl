@@ -96,22 +96,26 @@ impl MailView<'_> {
         }
         let max = inner.right().saturating_sub(1);
         let now = s.now_zoned();
-        // Counts.
+        // Counts, or why this login has no masks.
         let c = m.counts();
         let mut y = inner.y;
-        let mut parts: Vec<Part> = Vec::new();
-        for (i, st) in STATES.iter().enumerate() {
-            parts.push((format!("{} {}   ", c[i], state_name(*st)), StyleName::Text));
+        if let Some(why) = &s.masked_unavailable {
+            p.put(inner.x + 1, y, why, p.style(StyleName::StatusWarning), max);
+        } else {
+            let mut parts: Vec<Part> = Vec::new();
+            for (i, st) in STATES.iter().enumerate() {
+                parts.push((format!("{} {}   ", c[i], state_name(*st)), StyleName::Text));
+            }
+            parts.push((
+                format!(
+                    "     {} silent for 6+ months   {} got spam",
+                    m.silent(s.clock.now()),
+                    m.with_spam()
+                ),
+                StyleName::Dim,
+            ));
+            self.parts(p, inner.x + 1, y, &parts, max);
         }
-        parts.push((
-            format!(
-                "     {} silent for 6+ months   {} got spam",
-                m.silent(s.clock.now()),
-                m.with_spam()
-            ),
-            StyleName::Dim,
-        ));
-        self.parts(p, inner.x + 1, y, &parts, max);
         // State filters.
         y += 1;
         let mut x = p.put(inner.x + 1, y, "Show ", p.style(StyleName::Dim), max);
@@ -332,7 +336,9 @@ impl MailView<'_> {
             p.put(
                 inner.x + 2,
                 first,
-                if m.all.is_empty() {
+                if m.all.is_empty() && s.masked_unavailable.is_some() {
+                    "No masked addresses."
+                } else if m.all.is_empty() {
                     "No masked addresses yet. n makes one for a site."
                 } else {
                     "Nothing matches. Clear the search, show more states, or set silent and created by to any."

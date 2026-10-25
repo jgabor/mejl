@@ -253,6 +253,7 @@ fn dispatch(sh: &Arc<Shared>, command: Command) {
             sh.client.set_token(token);
             sh.resume_auth();
         }
+        Command::ResumeAuth => sh.resume_auth(),
         Command::Mutate {
             token,
             mutation,

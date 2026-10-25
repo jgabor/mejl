@@ -6,7 +6,9 @@ use std::sync::{Arc, PoisonError, RwLock};
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
+use crate::credentials::{Credentials, OAuthCredentials, OAuthProvider};
 use crate::error::{Error, RequestError, body_snippet, parse_retry_after};
+use crate::oauth::{TokenSet, check_endpoint};
 use crate::request::{Request, Response};
 use crate::secret::Secret;
 use crate::session::Session;
@@ -43,14 +45,19 @@ pub struct Client {
 pub(crate) struct Inner {
     pub(crate) transport: Arc<dyn Transport>,
     session_url: String,
-    token: RwLock<Secret>,
+    credentials: RwLock<Credentials>,
     session: RwLock<Option<Arc<Session>>>,
 }
 
 impl fmt::Debug for Client {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let auth = match &*self.credentials() {
+            Credentials::Static(_) => "token",
+            Credentials::OAuth(_) => "oauth",
+        };
         f.debug_struct("Client")
             .field("session_url", &self.inner.session_url)
+            .field("auth", &auth)
             .field("token", &"[redacted]")
             .field("has_session", &self.session().is_some())
             .finish_non_exhaustive()
@@ -58,17 +65,43 @@ impl fmt::Debug for Client {
 }
 
 impl Client {
-    /// A client for the session resource at `session_url`.
+    /// A client for the session resource at `session_url` with a fixed
+    /// token, such as an API token.
     pub fn new(
         transport: Arc<dyn Transport>,
         session_url: impl Into<String>,
         token: Secret,
     ) -> Self {
+        Self::with_credentials(transport, session_url.into(), Credentials::Static(token))
+    }
+
+    /// A client with an OAuth login that refreshes itself. See
+    /// [`crate::credentials`] for the rules. The token endpoint must be
+    /// https, or http on a loopback host.
+    pub fn with_oauth(
+        transport: Arc<dyn Transport>,
+        session_url: impl Into<String>,
+        credentials: OAuthCredentials,
+    ) -> Result<Self, Error> {
+        check_endpoint(&credentials.token_endpoint)?;
+        let provider = OAuthProvider::new(transport.clone(), credentials);
+        Ok(Self::with_credentials(
+            transport,
+            session_url.into(),
+            Credentials::OAuth(Arc::new(provider)),
+        ))
+    }
+
+    fn with_credentials(
+        transport: Arc<dyn Transport>,
+        session_url: String,
+        credentials: Credentials,
+    ) -> Self {
         Self {
             inner: Arc::new(Inner {
                 transport,
-                session_url: session_url.into(),
-                token: RwLock::new(token),
+                session_url,
+                credentials: RwLock::new(credentials),
                 session: RwLock::new(None),
             }),
         }
@@ -79,13 +112,56 @@ impl Client {
         &self.inner.session_url
     }
 
-    /// Replace the token, for example after an OAuth refresh.
+    /// Use a fixed token from now on, such as a pasted API token. On an
+    /// OAuth client this ends the OAuth login: nothing refreshes any more.
     pub fn set_token(&self, token: Secret) {
+        self.set_credentials(Credentials::Static(token));
+    }
+
+    /// Use a new OAuth login from now on, for example after `mejl login`
+    /// or to try again after a refresh failed. The refresh state starts
+    /// over.
+    pub fn set_oauth(&self, credentials: OAuthCredentials) -> Result<(), Error> {
+        check_endpoint(&credentials.token_endpoint)?;
+        let provider = OAuthProvider::new(self.inner.transport.clone(), credentials);
+        self.set_credentials(Credentials::OAuth(Arc::new(provider)));
+        Ok(())
+    }
+
+    /// The current OAuth tokens, or `None` for a fixed token.
+    pub fn oauth_tokens(&self) -> Option<TokenSet> {
+        match &*self.credentials() {
+            Credentials::Static(_) => None,
+            Credentials::OAuth(provider) => Some(provider.current()),
+        }
+    }
+
+    fn set_credentials(&self, credentials: Credentials) {
         *self
             .inner
-            .token
+            .credentials
             .write()
-            .unwrap_or_else(PoisonError::into_inner) = token;
+            .unwrap_or_else(PoisonError::into_inner) = credentials;
+    }
+
+    fn credentials(&self) -> std::sync::RwLockReadGuard<'_, Credentials> {
+        self.inner
+            .credentials
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// The token to send now, with the OAuth provider when there is one.
+    /// An OAuth token about to expire is refreshed first.
+    pub(crate) async fn bearer(&self) -> Result<(Secret, Option<Arc<OAuthProvider>>), Error> {
+        let credentials = self.credentials().clone();
+        match credentials {
+            Credentials::Static(token) => Ok((token, None)),
+            Credentials::OAuth(provider) => {
+                let token = provider.access_token().await?;
+                Ok((token, Some(provider)))
+            }
+        }
     }
 
     /// The loaded session, if any.
@@ -246,19 +322,8 @@ impl Client {
         absolute_url(&self.inner.session_url, url)
     }
 
-    /// Headers every request carries.
-    pub(crate) fn base_headers(&self) -> Vec<(String, String)> {
-        let token = self
-            .inner
-            .token
-            .read()
-            .unwrap_or_else(PoisonError::into_inner);
-        vec![
-            ("authorization".into(), format!("Bearer {}", token.expose())),
-            ("user-agent".into(), USER_AGENT.into()),
-        ]
-    }
-
+    /// Send a request with the bearer token. On an OAuth client a 401 gets
+    /// one refresh and one resend; a 403 does not.
     async fn send(
         &self,
         method: HttpMethod,
@@ -266,21 +331,47 @@ impl Client {
         body: Option<Bytes>,
         headers: &[(&str, &str)],
     ) -> Result<HttpResponse, Error> {
-        let mut all = self.base_headers();
+        let (token, provider) = self.bearer().await?;
+        let mut all = base_headers(&token);
         all.extend(
             headers
                 .iter()
                 .map(|(k, v)| ((*k).to_owned(), (*v).to_owned())),
         );
-        let req = HttpRequest {
+        let mut req = HttpRequest {
             method,
             url,
             headers: all,
             body,
         };
-        let resp = self.inner.transport.send(req).await?;
+        // The clone is cheap: the body is reference counted.
+        let mut resp = self.inner.transport.send(req.clone()).await?;
+        if resp.status == 401
+            && let Some(provider) = provider
+        {
+            let fresh = provider.renew(&token).await?;
+            set_bearer(&mut req.headers, &fresh);
+            resp = self.inner.transport.send(req).await?;
+        }
         check_status(resp.status, &resp.headers, &resp.body)?;
         Ok(resp)
+    }
+}
+
+/// Headers every request carries.
+pub(crate) fn base_headers(token: &Secret) -> Vec<(String, String)> {
+    vec![
+        ("authorization".into(), format!("Bearer {}", token.expose())),
+        ("user-agent".into(), USER_AGENT.into()),
+    ]
+}
+
+/// Replace the bearer token in a header list.
+pub(crate) fn set_bearer(headers: &mut [(String, String)], token: &Secret) {
+    for (name, value) in headers.iter_mut() {
+        if name.eq_ignore_ascii_case("authorization") {
+            *value = format!("Bearer {}", token.expose());
+        }
     }
 }
 
@@ -340,6 +431,7 @@ pub(crate) fn check_status(
         // Fastmail answers 403 for a token that lacks a scope or was
         // revoked; either way the fix is new credentials, as for 401.
         401 | 403 => Err(Error::Unauthorized {
+            status,
             www_authenticate: header("www-authenticate").map(str::to_owned),
         }),
         429 => Err(Error::RateLimited {
@@ -466,6 +558,18 @@ pub(crate) mod tests {
 
     fn assert_send<T: Send>(_: &T) {}
 
+    struct NoStore;
+
+    impl crate::credentials::TokenStore for NoStore {
+        fn load(&self) -> BoxFuture<'_, Option<TokenSet>> {
+            Box::pin(async { None })
+        }
+
+        fn save<'a>(&'a self, _: &'a TokenSet) -> BoxFuture<'a, Result<(), String>> {
+            Box::pin(async { Ok(()) })
+        }
+    }
+
     #[test]
     fn futures_are_send() {
         let fake = Arc::new(FakeTransport::default());
@@ -474,6 +578,53 @@ pub(crate) mod tests {
         assert_send(&client.fetch_session());
         assert_send(&client.call(&request));
         assert_send(&client.upload(&Id::from("A1"), "text/plain", Bytes::new()));
+
+        let oauth = Client::with_oauth(
+            fake.clone(),
+            "https://jmap.example.com/jmap/session",
+            OAuthCredentials {
+                tokens: TokenSet {
+                    access: Secret::new("a"),
+                    refresh: Secret::new("r"),
+                    expires_at: jiff::Timestamp::now(),
+                    scope: Vec::new(),
+                },
+                token_endpoint: "https://jmap.example.com/oauth/refresh".into(),
+                client_id: "c".into(),
+                store: Arc::new(NoStore),
+            },
+        )
+        .unwrap();
+        assert_send(&oauth.fetch_session());
+        assert_send(&oauth.call(&request));
+        assert_send(&oauth.push(&crate::push::PushOptions::default()));
+        assert!(oauth.oauth_tokens().is_some());
+        assert!(!format!("{oauth:?}").contains("\"a\""));
+        oauth.set_token(Secret::new("t"));
+        assert!(oauth.oauth_tokens().is_none());
+    }
+
+    #[test]
+    fn oauth_needs_a_safe_token_endpoint() {
+        let fake = Arc::new(FakeTransport::default());
+        let creds = OAuthCredentials {
+            tokens: TokenSet {
+                access: Secret::new("a"),
+                refresh: Secret::new("r"),
+                expires_at: jiff::Timestamp::now(),
+                scope: Vec::new(),
+            },
+            token_endpoint: "http://jmap.example.com/oauth/refresh".into(),
+            client_id: "c".into(),
+            store: Arc::new(NoStore),
+        };
+        assert!(matches!(
+            Client::with_oauth(fake.clone(), "https://jmap.example.com/", creds.clone()),
+            Err(Error::InvalidUrl { .. })
+        ));
+        let client = client_with(&fake);
+        assert!(client.set_oauth(creds).is_err());
+        assert!(client.oauth_tokens().is_none());
     }
 
     #[test]
@@ -549,7 +700,10 @@ pub(crate) mod tests {
             &h(&[("WWW-Authenticate", "Bearer resource_metadata=\"x\"")]),
             b"",
         ) {
-            Err(Error::Unauthorized { www_authenticate }) => {
+            Err(Error::Unauthorized {
+                status: 401,
+                www_authenticate,
+            }) => {
                 assert_eq!(
                     www_authenticate.as_deref(),
                     Some("Bearer resource_metadata=\"x\"")
@@ -559,7 +713,7 @@ pub(crate) mod tests {
         }
         assert!(matches!(
             check_status(403, &[], b"forbidden"),
-            Err(Error::Unauthorized { .. })
+            Err(Error::Unauthorized { status: 403, .. })
         ));
         match check_status(429, &h(&[("retry-after", "7")]), b"") {
             Err(Error::RateLimited { retry_after }) => {
@@ -710,7 +864,9 @@ pub(crate) mod tests {
         let fake = Arc::new(FakeTransport::default());
         let client = client_with(&fake);
         client.set_token(Secret::new("tok-456"));
-        let headers = client.base_headers();
+        let (token, provider) = block_on(client.bearer()).unwrap();
+        assert!(provider.is_none());
+        let headers = base_headers(&token);
         assert!(
             headers
                 .iter()

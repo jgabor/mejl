@@ -14,7 +14,7 @@ use tokio_util::sync::CancellationToken;
 use crate::apply::{self, Apply};
 use crate::bodies::BodyMsg;
 use crate::config::EngineConfig;
-use crate::error::{Class, SyncError};
+use crate::error::{Class, SyncError, is_temporary_auth};
 use crate::event::{PushState, SyncEvent};
 use crate::status::{Events, StatusCell, Trigger};
 use crate::store_thread::StoreHandle;
@@ -134,26 +134,31 @@ impl Shared {
     }
 
     /// Stops network work until new credentials arrive. Emits the event
-    /// once per failure, not once per task that hits it.
-    pub(crate) fn auth_failed(&self, error: &str) {
+    /// once per failure, not once per task that hits it. `temporary` marks
+    /// an OAuth login that is locked for now rather than revoked.
+    pub(crate) fn auth_failed(&self, error: &str, temporary: bool) {
         if !self.auth_failed.swap(true, Ordering::SeqCst) {
-            tracing::warn!("the server rejected the credentials");
+            tracing::warn!(temporary, "the server rejected the credentials");
             self.status.update(|s| {
                 s.auth_failed = true;
+                s.auth_temporary = temporary;
                 s.last_error = Some(error.to_owned());
             });
             self.events.emit(SyncEvent::AuthFailed {
                 error: error.to_owned(),
+                temporary,
             });
         }
     }
 
-    /// New credentials: resume everything.
+    /// New credentials, or another try with the same ones: resume
+    /// everything.
     pub(crate) fn resume_auth(&self) {
         self.auth_failed.store(false, Ordering::SeqCst);
         self.session_stale.store(true, Ordering::SeqCst);
         self.status.update(|s| {
             s.auth_failed = false;
+            s.auth_temporary = false;
             s.last_error = None;
         });
         self.auth_wake.notify_waiters();
@@ -206,7 +211,7 @@ impl Shared {
     pub(crate) fn note(&self, err: &SyncError) -> Class {
         let class = err.class();
         match class {
-            Class::Auth => self.auth_failed(&err.to_string()),
+            Class::Auth => self.auth_failed(&err.to_string(), err.is_temporary_auth()),
             Class::Network => self.set_online(false),
             _ => {}
         }
@@ -225,7 +230,7 @@ impl Shared {
                 let class = crate::error::classify_jmap(e);
                 match class {
                     Class::Network => self.set_online(false),
-                    Class::Auth => self.auth_failed(&e.to_string()),
+                    Class::Auth => self.auth_failed(&e.to_string(), is_temporary_auth(e)),
                     // Any HTTP answer means the network works.
                     _ => self.set_online(true),
                 }

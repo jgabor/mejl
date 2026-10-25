@@ -156,6 +156,25 @@ pub struct Quirks {
     /// as a token without that scope would see it. The API still answers
     /// methods of these capabilities; this only changes what is advertised.
     pub session_without: Vec<String>,
+    /// The next N JMAP requests get `403 Forbidden`, as a token that lacks
+    /// a needed scope would.
+    pub http_403_next: u32,
+    /// How long new OAuth access tokens live. Expiry is checked against
+    /// the fake's clock, which moves one second each time the server reads
+    /// it. A lifetime under the client's 60 second margin makes the client
+    /// refresh before every request.
+    pub access_token_lifetime: Duration,
+    /// `/oauth/authorize` answers `invalid_scope` when the Masked Email
+    /// scope is asked for.
+    pub refuse_masked_scope: bool,
+    /// `/oauth/register` refuses every registration.
+    pub refuse_registration: bool,
+    /// The next N refreshes get `invalid_grant` with `temporary: true`, as
+    /// a locked account would. Nothing changes on the server.
+    pub refresh_temporary_invalid_grant_next: u32,
+    /// The next N refreshes take effect, then the response is lost, as in
+    /// [`Quirks::lose_api_response_next`].
+    pub lose_refresh_response_next: u32,
 }
 
 impl Default for Quirks {
@@ -173,6 +192,12 @@ impl Default for Quirks {
             push_chunk_size: None,
             lose_api_response_next: 0,
             session_without: Vec::new(),
+            http_403_next: 0,
+            access_token_lifetime: Duration::from_secs(3600),
+            refuse_masked_scope: false,
+            refuse_registration: false,
+            refresh_temporary_invalid_grant_next: 0,
+            lose_refresh_response_next: 0,
         }
     }
 }
