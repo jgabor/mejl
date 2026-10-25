@@ -1,0 +1,8 @@
+# CodeQL config for the workflow in .github/workflows/codeql.yml.
+# Integration tests and benches are test code; alerts there are not real.
+# Inline `#[cfg(test)] mod tests` blocks are dropped from the results by
+# filter-tests.py, because CodeQL cannot ignore part of a file.
+name: mejl
+paths-ignore:
+  - "crates/*/tests/**"
+  - "crates/*/benches/**"

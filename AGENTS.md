@@ -34,3 +34,4 @@ The UI mock-ups in `docs/mockups.html` are the visual target.
 - Rendered Sieve never contains `keep` or `discard`, only allowlisted extensions, and escapes `"` and `\`.
 - The UI thread never awaits and never blocks on the network.
 - Docs and comments: plain words, sentence case headings, no em dashes.
+- Inline `#[cfg(test)] mod tests` blocks go last in their file. The CodeQL workflow treats everything from that line to the end of the file as test code (`.github/codeql/filter-tests.py`).

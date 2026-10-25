@@ -1,0 +1,45 @@
+# CodeQL code scanning, without test code. It replaces GitHub's default
+# setup, which cannot leave tests out. See .github/codeql/.
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [rust, actions]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          config-file: ./.github/codeql/codeql-config.yml
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
+          upload: never
+          output: sarif
+      - name: Drop results in test code
+        run: python3 .github/codeql/filter-tests.py sarif
+      - uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif
+          category: /language:${{ matrix.language }}
