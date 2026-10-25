@@ -23,7 +23,7 @@ fn act(action: Action) -> Resolution {
 
 #[test]
 fn presets_have_no_conflicts_or_legacy_only_keys() {
-    for preset in [Preset::Fastmail, Preset::Vim] {
+    for preset in Preset::ALL {
         let map = Keymap::preset(preset);
         let problems = map.check();
         assert!(problems.is_empty(), "{preset:?}: {problems:#?}");
@@ -34,6 +34,37 @@ fn presets_have_no_conflicts_or_legacy_only_keys() {
             "{preset:?}: a preset binding failed to parse or repeats"
         );
     }
+}
+
+#[test]
+fn the_gmail_preset_follows_gmail_keys() {
+    let map = Keymap::preset(Preset::Gmail);
+    for (keys, action) in [
+        ("e", Action::Archive),
+        ("y", Action::Archive),
+        ("#", Action::Trash),
+        ("!", Action::ReportSpam),
+        ("s", Action::TogglePin),
+        ("I", Action::MarkRead),
+        ("U", Action::MarkUnread),
+        ("m", Action::Mute),
+        ("v", Action::MoveTo),
+        (".", Action::ActionsMenu),
+    ] {
+        assert_eq!(run(&map, LIST, keys), [act(action)], "{keys}");
+    }
+    assert_eq!(run(&map, READER, ";"), [act(Action::ExpandAll)]);
+    assert_eq!(
+        run(&map, LIST, "g t"),
+        [Resolution::Pending, act(Action::GoSent)]
+    );
+    assert_eq!(
+        run(&map, LIST, "g #"),
+        [Resolution::Pending, act(Action::GoTrash)]
+    );
+    // Keys from the other presets stay unbound.
+    assert_eq!(run(&map, LIST, "d"), [Resolution::Unbound]);
+    assert!(!Preset::Gmail.counts());
 }
 
 #[test]

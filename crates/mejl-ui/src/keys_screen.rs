@@ -1498,16 +1498,18 @@ mod tests {
 
     #[test]
     fn saved_overrides_rebuild_the_edited_map() {
-        for preset in [Preset::Fastmail, Preset::Vim] {
+        for preset in Preset::ALL {
             let base = Keymap::preset(preset);
             let mut map = base.clone();
             let archive = keys(&base, Context::List, Action::Archive)[0].clone();
+            // Taking the trash key swaps: archive's old key now trashes.
+            let trash = keys(&base, Context::List, Action::Trash)[0].clone();
             map = bind(
                 &map,
                 Section::Mail,
                 Action::Archive,
                 Mode::Replace,
-                &seq("d"),
+                &trash,
                 true,
             )
             .unwrap()

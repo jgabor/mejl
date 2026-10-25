@@ -211,7 +211,7 @@ mod tests {
 
     #[test]
     fn a_diff_applied_to_the_base_gives_the_edited_keymap() {
-        for preset in [Preset::Fastmail, Preset::Vim] {
+        for preset in Preset::ALL {
             let base = Keymap::preset(preset);
             let mut edited = base.clone();
             edited.unbind(Context::List, &seq("y"));

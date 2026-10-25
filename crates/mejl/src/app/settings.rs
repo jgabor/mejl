@@ -36,6 +36,7 @@ pub struct Settings {
 pub fn preset(p: Preset) -> ui::Preset {
     match p {
         Preset::Fastmail => ui::Preset::Fastmail,
+        Preset::Gmail => ui::Preset::Gmail,
         Preset::Vim => ui::Preset::Vim,
     }
 }
@@ -785,7 +786,7 @@ mod tests {
         assert_eq!(list["ctrl-n"].as_str(), Some("next"));
         assert!(out.contains("[presets.mine.keys.list]"), "{out}");
         assert!(!out.contains("[presets]\n"), "no empty header: {out}");
-        for bad in ["vim", "Mine", "", "a b"] {
+        for bad in ["vim", "gmail", "Mine", "", "a b"] {
             let e = edit_keys_text(
                 &out,
                 &KeysEdit::NewPreset {

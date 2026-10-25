@@ -71,7 +71,7 @@ impl Row {
         match self {
             Row::Theme => "terminal uses your terminal's colours; mono and high-contrast use none",
             Row::Preset => {
-                "fastmail follows Fastmail's web shortcuts, vim follows aerc; Enter edits keys"
+                "fastmail and gmail follow their web shortcuts, vim follows aerc; Enter edits keys"
             }
             Row::Density => "compact drops date headings; relaxed shows a preview line",
             Row::PreferHtml => "show the HTML part when a message has both; V switches per message",
@@ -189,7 +189,7 @@ mod tests {
         assert_eq!(Row::Theme.value(&c), "terminal");
         assert_eq!(Row::Theme.step(&c, true), Setting::Theme("mono".into()));
         assert_eq!(Row::Theme.step(&c, false), Setting::Theme("light".into()));
-        assert_eq!(Row::Preset.step(&c, true), Setting::Preset("vim".into()));
+        assert_eq!(Row::Preset.step(&c, true), Setting::Preset("gmail".into()));
         assert_eq!(
             Row::Density.step(&c, true),
             Setting::Density(Density::Relaxed)

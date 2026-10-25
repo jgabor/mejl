@@ -179,7 +179,7 @@ Layers, from always-on to on-demand:
 ### Configurable keymaps
 
 - TOML file with `[keys.list]`, `[keys.reader]`, `[keys.compose]`, `[keys.global]` sections, each mapping a key string to a command name. Same command names as the palette, so users can discover a name in the palette and bind it (inferred).
-- Named presets (`preset = "fastmail" | "vim"`), with user overrides on top, like zellij's presets (verified that zellij ships presets).
+- Named presets (`preset = "fastmail" | "gmail" | "vim"`), with user overrides on top, like zellij's presets (verified that zellij ships presets).
 - As built: custom presets. A custom preset is a built-in base plus its own changes (`[presets.<name>]` with `base` and `keys`), so actions added to mejl later still get their default keys. The key editor (settings, Enter on Keys) works like the controls screen of a PC game: duplicate a preset, pick a command, press the new key. It checks every context active when the key fires, offers swap or replace on a clash, refuses keys that would break a prefix, never removes the last key of back, help, the palette, quit-now or settings, and refuses plain letters in compose, search and help, where they type. The top-level `[keys]` table still applies on top of any preset.
 - Key parsing: `crokey` (1.5.1) parses and formats key combos such as `ctrl-k` for crossterm events (verified: crates.io; API detail unverified). A small in-house parser is also realistic.
 - `mejl keys --check` reports conflicts and keys that legacy encoding cannot deliver (for example `ctrl-shift-x` or `ctrl-i` distinct from Tab) (inferred).
@@ -199,7 +199,7 @@ Layers, from always-on to on-demand:
 3. Non-overlapping prefixes with which-key popups. No timeouts on any binding.
 4. Everything is a named command, reachable from the palette, bindable in config.
 5. Every default binding works with legacy encoding. Kitty-only keys (Ctrl+Enter, Ctrl+Shift) are alternates, never the only way.
-6. Two presets: `fastmail` (default) and `vim` (aerc-like). User overrides on top.
+6. Three presets: `fastmail` (default), `gmail` and `vim` (aerc-like). User overrides on top.
 7. Destructive actions are undoable (`z`, as in Fastmail) instead of confirmed.
 
 ## Mouse as a convenience
@@ -581,6 +581,8 @@ Compose:
 Precedence rule: a focused text field owns every key its editor binds. the Emacs-like defaults the body editor follows include `C-a`/`C-e`, `C-n`/`C-p`, `C-f`/`C-b`, `C-h`/`C-d`, `C-k`, `C-j` and yank (verified: [README](https://github.com/ratatui/ratatui-textarea)), so global `Ctrl-k`/`Ctrl-p` (palette) and `Ctrl-y` (redo) do not apply inside the body. mejl reserves only `Ctrl-o`, `Ctrl-s` and `Ctrl-Enter` in text fields and intercepts them before the widget sees the event (inferred; check the widget's full key table and whether it offers input handling without its default shortcuts). Global keys are reachable after `Esc`.
 
 Alt keys are deliberately absent from the compose defaults. In legacy encoding `Alt-x` arrives as Esc followed by `x`; over SSH, or with tmux's 10 ms `escape-time`, the two bytes can arrive in separate reads, so `Alt-a` could be read as "Esc" then "a" (inferred from the encoding). With the kitty protocol's disambiguate flag this problem goes away, so Alt bindings are fine as user overrides on terminals that support it.
+
+Gmail preset differences (from Gmail's web shortcuts, inferred from memory and not checked against the live help page): `e` and `y` archive; `#` moves to trash (permanent delete has no key); `!` reports spam; `m` mutes and `v` moves; `Shift-I` and `Shift-U` mark read and unread; `s` toggles the pin (Gmail's star); `.` opens the actions menu; `;` expands all messages in the reader; `g t` goes to Sent, `g l` to a folder, `g a` to Archive; trash and spam have no Gmail go-to key, so they are `g #` and `g !`. The `.` mark prefix does not exist, so pin and unpin have no separate keys.
 
 Vim preset differences: `j`/`k` scroll in the reader and `J`/`K` move between conversations; `gg`/`G`; counts on motions; `a` archive; `r` becomes a prefix (`r r` reply all, `r s` reply sender, `r q` quoted, after aerc's `rr`/`Rr`/`rq`); `.` repeats the last action; `u` undo; `z` fold prefix (`z c`, `z o`, `z a`); `Space` leader for mejl tools (`Space r` rules, `Space m` masked email).
 

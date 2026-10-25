@@ -54,7 +54,7 @@
 //! # Keys
 //!
 //! [`Keymap`] holds per-[`Context`] binding tables built from a
-//! [`Preset`] (Fastmail web shortcuts by default, or vim) with user
+//! [`Preset`] (Fastmail web shortcuts by default, Gmail's, or vim) with user
 //! overrides from the `[keys]` TOML table ([`KeyOverrides`]). Prefixes such
 //! as `g`, `.`, `*` never act on their own, so nothing waits on a timeout;
 //! the which-key popup shows what can follow. [`Keymap::check`] reports

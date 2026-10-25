@@ -14,7 +14,7 @@
 //! | `accounts.<name>.token_command` | none | Command that prints the token, for systems without a keyring |
 //! | `accounts.<name>.oauth_client_id` | none | OAuth client id Fastmail gave you, used by `mejl login` instead of registering one |
 //! | `ui.theme` | `terminal` | Built-in theme name, or `auto:<name>` |
-//! | `ui.preset` | `fastmail` | Key preset: `fastmail`, `vim`, or the name of a custom preset |
+//! | `ui.preset` | `fastmail` | Key preset: `fastmail`, `gmail`, `vim`, or the name of a custom preset |
 //! | `ui.density` | `comfortable` | List density: `compact`, `comfortable` or `relaxed` |
 //! | `ui.prefer_html` | `false` | Show the HTML part when a message has both |
 //! | `ui.undo_send_seconds` | `10` | Hold sent mail this long so it can be undone (0 to 300) |
@@ -153,18 +153,21 @@ pub enum Preset {
     /// Fastmail web's keys.
     #[default]
     Fastmail,
+    /// Gmail web's keys.
+    Gmail,
     /// Vim-style keys.
     Vim,
 }
 
 impl Preset {
     /// Every built-in preset.
-    pub const ALL: [Preset; 2] = [Preset::Fastmail, Preset::Vim];
+    pub const ALL: [Preset; 3] = [Preset::Fastmail, Preset::Gmail, Preset::Vim];
 
     /// The config name.
     pub fn name(self) -> &'static str {
         match self {
             Preset::Fastmail => "fastmail",
+            Preset::Gmail => "gmail",
             Preset::Vim => "vim",
         }
     }
@@ -605,7 +608,7 @@ fn validate(
                 span_of(doc, &["presets", name.as_str()]),
                 format!(
                     "preset name `{name}` must be lowercase letters, digits and dashes, and not \
-                     `fastmail` or `vim`"
+                     a built-in preset name"
                 ),
             ));
         }
@@ -809,7 +812,7 @@ pub fn example_config() -> String {
 [ui]
 # Built-in themes: {themes}. "auto:<name>" picks a light or dark variant.
 # theme = "{theme}"
-# Key preset: "fastmail", "vim", or the name of a preset under [presets].
+# Key preset: "fastmail", "gmail", "vim", or the name of a preset under [presets].
 # preset = "fastmail"
 # List density: "compact", "comfortable" or "relaxed".
 # density = "comfortable"
@@ -1008,9 +1011,9 @@ body_cache_mb = 512
         assert_eq!(loaded.warnings.len(), 1, "{:?}", loaded.warnings);
         assert!(loaded.warnings[0].message.contains("presets.mine.colour"));
         let e = errors("[ui]\npreset = \"ours\"\n[presets.mine]\n");
-        assert!(e[0].message.contains("fastmail, vim, mine"), "{e:?}");
+        assert!(e[0].message.contains("fastmail, gmail, vim, mine"), "{e:?}");
         let e = errors("[presets.vim]\nbase = \"fastmail\"\n");
-        assert!(e[0].message.contains("not `fastmail` or `vim`"), "{e:?}");
+        assert!(e[0].message.contains("not a built-in preset name"), "{e:?}");
         let e = errors("[presets.Mine]\n");
         assert!(e[0].message.contains("lowercase"), "{e:?}");
     }

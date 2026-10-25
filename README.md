@@ -81,7 +81,7 @@ The config file is `config.toml` in mejl's config folder. On Linux that is `~/.c
 ```toml
 [ui]
 theme = "terminal"        # terminal, mono, high-contrast, dark or light
-preset = "fastmail"       # key preset: "fastmail", "vim" or one of your own
+preset = "fastmail"       # key preset: "fastmail", "gmail", "vim" or one of your own
 density = "comfortable"   # compact, comfortable or relaxed
 undo_send_seconds = 10    # how long a sent message waits so you can undo it
 mark_read_delay_ms = 0    # wait before marking an opened message read
@@ -120,7 +120,7 @@ The default keys follow Fastmail's web shortcuts, so they are what you know from
 | `g r` | Rules |
 | `q` | Back, then quit |
 
-Prefer vim keys? Set `preset = "vim"`.
+Prefer Gmail's keys or vim keys? Set `preset = "gmail"` or `preset = "vim"`. Gmail's preset archives with `e`, trashes with `#`, marks read and unread with `Shift-I` and `Shift-U`, stars (pins) with `s`, and goes to Sent with `g t`. Gmail has no keys for the trash and spam folders, so they are `g #` and `g !`.
 
 ### Your own keys
 

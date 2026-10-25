@@ -1,8 +1,8 @@
 //! The built-in key presets.
 //!
 //! `fastmail` is the default and follows Fastmail's web shortcuts, so
-//! Fastmail users relearn nothing. `vim` follows aerc and vim habits. Both
-//! use only non-overlapping prefixes and only keys legacy encoding can
+//! Fastmail users relearn nothing. `gmail` follows Gmail's web shortcuts.
+//! `vim` follows aerc and vim habits. All three use only non-overlapping prefixes and only keys legacy encoding can
 //! deliver, which the tests check.
 //!
 //! Ctrl+Z suspends mejl in every context, as it does in a shell and in
@@ -22,6 +22,9 @@ pub enum Preset {
     /// Fastmail's web shortcuts. The default.
     #[default]
     Fastmail,
+    /// Gmail's web shortcuts: `e` archives, `#` trashes, `Shift-I` and
+    /// `Shift-U` mark read and unread, `s` stars (pins).
+    Gmail,
     /// vim and aerc style: `j`/`k` scroll in the reader, `a` archives,
     /// `u` undoes, counts before motions.
     Vim,
@@ -29,12 +32,13 @@ pub enum Preset {
 
 impl Preset {
     /// Every built-in preset.
-    pub const ALL: [Preset; 2] = [Preset::Fastmail, Preset::Vim];
+    pub const ALL: [Preset; 3] = [Preset::Fastmail, Preset::Gmail, Preset::Vim];
 
     /// Config name.
     pub fn name(self) -> &'static str {
         match self {
             Preset::Fastmail => "fastmail",
+            Preset::Gmail => "gmail",
             Preset::Vim => "vim",
         }
     }
@@ -43,6 +47,7 @@ impl Preset {
     pub fn from_name(name: &str) -> Option<Preset> {
         match name {
             "fastmail" => Some(Preset::Fastmail),
+            "gmail" => Some(Preset::Gmail),
             "vim" => Some(Preset::Vim),
             _ => None,
         }
@@ -57,6 +62,7 @@ impl Preset {
     pub(crate) fn bindings(self) -> Vec<(Context, &'static str, A)> {
         let (global, triage, list, reader) = match self {
             Preset::Fastmail => (FM_GLOBAL, FM_TRIAGE, FM_LIST, FM_READER),
+            Preset::Gmail => (GM_GLOBAL, GM_TRIAGE, FM_LIST, GM_READER),
             Preset::Vim => (VIM_GLOBAL, VIM_TRIAGE, VIM_LIST, VIM_READER),
         };
         let mut out = Vec::new();
@@ -85,6 +91,13 @@ impl Preset {
             Preset::Fastmail => &[
                 ("g", "go to"),
                 (".", "mark"),
+                ("*", "select"),
+                ("b", "snooze (web only)"),
+                ("@", "masked email"),
+                ("ctrl-o", "compose"),
+            ],
+            Preset::Gmail => &[
+                ("g", "go to"),
                 ("*", "select"),
                 ("b", "snooze (web only)"),
                 ("@", "masked email"),
@@ -225,6 +238,123 @@ const FM_READER: &[(&str, A)] = &[
     ("enter", A::Open),
     ("e", A::Expand),
     ("E", A::ExpandAll),
+    ("\"", A::ToggleQuotes),
+    ("H", A::ToggleHeaders),
+    ("L", A::Links),
+    ("V", A::ToggleHtml),
+];
+
+/// Gmail has no key for the trash or spam folders, so they follow the keys
+/// that file mail there: `g #` and `g !`.
+const GM_GO: [(&str, A); 12] = [
+    GO[0],
+    GO[1],
+    ("g t", A::GoSent),
+    GO[3],
+    ("g #", A::GoTrash),
+    ("g !", A::GoSpam),
+    ("g l", A::GoMailbox),
+    GO[7],
+    GO[8],
+    GO[9],
+    GO[10],
+    GO[11],
+];
+
+const GM_GLOBAL: &[(&str, A)] = &[
+    ("?", A::Help),
+    (":", A::Palette),
+    ("ctrl-k", A::Palette),
+    ("ctrl-p", A::Palette),
+    ("/", A::Search),
+    ("u", A::Back),
+    ("esc", A::Back),
+    ("q", A::Quit),
+    ("Q", A::QuitNow),
+    ("ctrl-z", A::Suspend),
+    ("z", A::Undo),
+    ("ctrl-y", A::Redo),
+    ("c", A::Compose),
+    ("tab", A::NextPane),
+    ("shift-tab", A::PrevPane),
+    ("ctrl-l", A::Refresh),
+    ("G", A::GoBottom),
+    ("home", A::GoTop),
+    ("end", A::GoBottom),
+    GM_GO[0],
+    GM_GO[1],
+    GM_GO[2],
+    GM_GO[3],
+    GM_GO[4],
+    GM_GO[5],
+    GM_GO[6],
+    GM_GO[7],
+    GM_GO[8],
+    GM_GO[9],
+    GM_GO[10],
+    GM_GO[11],
+];
+
+/// Permanent delete has no Gmail key; the palette still has it.
+const GM_TRIAGE: &[(&str, A)] = &[
+    ("space", A::PageDown),
+    ("pgdn", A::PageDown),
+    ("pgup", A::PageUp),
+    ("ctrl-d", A::HalfPageDown),
+    ("ctrl-u", A::HalfPageUp),
+    ("x", A::ToggleSelect),
+    ("X", A::SelectRange),
+    ("* a", A::SelectAll),
+    ("* n", A::SelectNone),
+    ("e", A::Archive),
+    ("y", A::Archive),
+    ("[", A::ArchivePrev),
+    ("]", A::ArchiveNext),
+    ("#", A::Trash),
+    ("!", A::ReportSpam),
+    ("v", A::MoveTo),
+    ("l", A::Label),
+    ("s", A::TogglePin),
+    ("I", A::MarkRead),
+    ("U", A::MarkUnread),
+    ("m", A::Mute),
+    ("b 1", A::Snooze),
+    ("b 2", A::Snooze),
+    ("b 3", A::Snooze),
+    ("b 4", A::Snooze),
+    ("b 5", A::Snooze),
+    ("b 6", A::Snooze),
+    ("b 7", A::Snooze),
+    ("r", A::Reply),
+    ("a", A::ReplyAll),
+    ("f", A::Forward),
+    (".", A::ActionsMenu),
+    ("T", A::ToggleThreads),
+    ("O", A::OpenInBrowser),
+    ("Y", A::CopyMenu),
+    ("F", A::NewRule),
+    ("@ x", A::MaskedDisable),
+    ("@ e", A::MaskedEnable),
+    ("@ d", A::MaskedDelete),
+    ("@ r", A::MaskedRule),
+    ("@ m", A::MaskedMessages),
+    ("@ y", A::MaskedCopy),
+    ("@ n", A::MaskedNew),
+    ("@ @", A::MaskActions),
+];
+
+/// `e` archives in Gmail, so expanding one message has no key here; `;`
+/// expands them all.
+const GM_READER: &[(&str, A)] = &[
+    ("j", A::Next),
+    ("k", A::Prev),
+    ("down", A::ScrollDown),
+    ("up", A::ScrollUp),
+    ("n", A::NextMessage),
+    ("p", A::PrevMessage),
+    ("o", A::Open),
+    ("enter", A::Open),
+    (";", A::ExpandAll),
     ("\"", A::ToggleQuotes),
     ("H", A::ToggleHeaders),
     ("L", A::Links),
