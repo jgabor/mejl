@@ -34,6 +34,10 @@ pub enum Category {
     Rules,
     /// The settings screen.
     Settings,
+    /// The key binding editor.
+    Keys,
+    /// The user's macros.
+    Macros,
 }
 
 impl Category {
@@ -52,6 +56,8 @@ impl Category {
             Category::Masked => "Masked Email",
             Category::Rules => "Rules",
             Category::Settings => "Settings",
+            Category::Keys => "Key bindings",
+            Category::Macros => "Macros",
         }
     }
 }
@@ -122,6 +128,7 @@ actions! {
     GoRules => "go-rules", "Rules (Sieve)", Tools, "Open the rules manager";
     GoMasked => "go-masked", "Masked Email", Tools, "Open the Masked Email manager";
     GoSettings => "go-settings", "Settings", Tools, "Open settings";
+    EditKeys => "edit-keys", "key bindings", Tools, "Edit key bindings";
     Next => "next", "next", Navigate, "Next conversation, or next item";
     Prev => "prev", "previous", Navigate, "Previous conversation, or previous item";
     Open => "open", "open", Navigate, "Open the conversation or mailbox under the cursor";
@@ -207,6 +214,20 @@ actions! {
     RulePasteCheck => "rule-paste-check", "paste back", Rules, "Paste your Fastmail script back to check it";
     SettingChange => "setting-change", "change", Settings, "Change the setting to its next value";
     SettingChangeBack => "setting-change-back", "change back", Settings, "Change the setting to its previous value";
+    SettingOpen => "setting-open", "change", Settings, "Change the setting; on the Keys row, open the key editor";
+    KeyReplace => "key-replace", "replace", Keys, "Give the row one new key in place of all its keys; on a macro, open its steps";
+    KeyAdd => "key-add", "add key", Keys, "Add a key to the row; in a macro, add a step";
+    KeyRemove => "key-remove", "remove key", Keys, "Remove a key from the row; in a macro, remove the step; on a macro, delete it";
+    KeyReset => "key-reset", "reset", Keys, "Give the row its keys from the base preset again";
+    PresetDuplicate => "preset-duplicate", "duplicate", Keys, "Make your own copy of the preset";
+    PresetRename => "preset-rename", "rename preset", Keys, "Rename your preset";
+    PresetDelete => "preset-delete", "delete preset", Keys, "Delete your preset; its base preset takes over";
+    PresetSwitch => "preset-switch", "switch preset", Keys, "Use another preset";
+    MacroNew => "macro-new", "new macro", Keys, "Make a new macro";
+    MacroRename => "macro-rename", "rename macro", Keys, "Rename the macro";
+    MacroBind => "macro-bind", "bind key", Keys, "Bind a key to the macro, in the list and the reader";
+    MacroStepUp => "macro-step-up", "step up", Keys, "Move the step up, so it runs earlier";
+    MacroStepDown => "macro-step-down", "step down", Keys, "Move the step down, so it runs later";
 }
 
 impl Action {
@@ -269,7 +290,7 @@ impl fmt::Display for Action {
     }
 }
 
-fn edit_distance(a: &str, b: &str) -> usize {
+pub(crate) fn edit_distance(a: &str, b: &str) -> usize {
     let b: Vec<char> = b.chars().collect();
     let mut prev: Vec<usize> = (0..=b.len()).collect();
     for (i, ca) in a.chars().enumerate() {

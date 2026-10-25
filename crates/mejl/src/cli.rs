@@ -640,7 +640,7 @@ fn run_keys(
         return Ok(());
     }
     let loaded = load_config(ctx, err)?;
-    let report = keys::check_keys_with(&loaded.config.keys, loaded.config.ui.preset);
+    let report = keys::check_keys(&loaded.config);
     for line in &report.lines {
         writeln!(out, "{line}")?;
     }
@@ -844,7 +844,7 @@ mod tests {
         h.paths = h.paths.clone().with_config_file(other);
         let (result, out, _) = h.run(&["keys", "--check"]);
         result.unwrap();
-        assert!(out.contains("1 key override in 1 context"), "{out}");
+        assert!(out.contains("1 [keys] override"), "{out}");
     }
 
     #[test]

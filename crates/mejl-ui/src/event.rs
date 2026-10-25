@@ -31,7 +31,8 @@ use crate::data::{
     BlobId, ConversationRow, DraftId, EmailId, MailboxId, MaskedEmailView, MaskedState,
     OutgoingAttachment, OutgoingMessage, RuleJson, ThreadId,
 };
-use crate::keymap::Preset;
+use crate::keymap::{Context, KeyOverrides, KeySeq, Preset};
+use crate::macros::Macro;
 use crate::state::{Density, UiConfig};
 
 /// An input to [`update`](crate::update).
@@ -159,6 +160,61 @@ pub enum Msg {
     /// The shell builds the whole config (theme, keymap with the user's
     /// overrides) and the UI applies it at once.
     Config(Box<UiConfig>),
+    /// A [`Cmd::SaveSetting`] or [`Cmd::EditKeys`] was refused and nothing
+    /// changed, for example because the keys would conflict.
+    SettingRefused {
+        /// Why, in words.
+        error: String,
+    },
+}
+
+/// A change the key editor makes to custom presets or macros. The shell
+/// writes it to the config file and answers with [`Msg::Config`], or with
+/// [`Msg::SettingRefused`] when the result would not load.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum KeysEdit {
+    /// Replaces a custom preset's own overrides, and drops these keys
+    /// from the top-level `[keys]` table so the edit takes effect.
+    SetPresetKeys {
+        /// The custom preset.
+        preset: String,
+        /// Its new overrides, a diff from its base.
+        overrides: KeyOverrides,
+        /// `[keys]` entries the edit takes over.
+        drop_user: Vec<(Context, KeySeq)>,
+    },
+    /// Makes a custom preset and switches to it.
+    NewPreset {
+        /// Its name.
+        name: String,
+        /// The built-in preset it changes.
+        base: Preset,
+        /// Its overrides.
+        overrides: KeyOverrides,
+        /// Move the top-level `[keys]` table into it, so the keys in
+        /// effect stay the same.
+        take_user: bool,
+    },
+    /// Renames a custom preset, and `ui.preset` with it when it is active.
+    RenamePreset {
+        /// The old name.
+        from: String,
+        /// The new name.
+        to: String,
+    },
+    /// Deletes a custom preset. When it is active, its base becomes the
+    /// active preset.
+    DeletePreset {
+        /// The name.
+        name: String,
+    },
+    /// Adds a macro, or replaces the one with the same id.
+    SaveMacro(Box<Macro>),
+    /// Deletes a macro.
+    DeleteMacro {
+        /// Its id.
+        id: String,
+    },
 }
 
 /// The state of a send.
@@ -203,8 +259,8 @@ pub enum SendOutcome {
 pub enum Setting {
     /// Theme by name.
     Theme(String),
-    /// Key preset.
-    Preset(Preset),
+    /// Key preset, by name: built-in or custom.
+    Preset(String),
     /// List row density.
     Density(Density),
     /// Show the HTML part when a message has both.
@@ -488,6 +544,9 @@ pub enum Cmd {
     },
     /// Change a setting. Answer with [`Msg::Config`].
     SaveSetting(Setting),
+    /// Change custom presets or macros. Answer with [`Msg::Config`] or
+    /// [`Msg::SettingRefused`].
+    EditKeys(KeysEdit),
 }
 
 /// Parameters for [`Cmd::RenderBody`].
@@ -558,6 +617,46 @@ pub enum Keyword {
     Muted,
 }
 
+/// One change in a [`Mutation::Batch`]. Folders are mailbox ids; the
+/// Archive, Trash and Spam steps name a role, which the shell resolves as
+/// it does for [`Mutation::Archive`] and the others.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BatchStep {
+    /// Set or clear a keyword.
+    Keyword {
+        /// Which keyword.
+        keyword: Keyword,
+        /// `true` sets it, `false` clears it.
+        value: bool,
+    },
+    /// Move to the Archive mailbox. The shell's mark read on archive
+    /// setting applies.
+    Archive,
+    /// Move to Trash.
+    Trash,
+    /// Report as spam and move to the Junk mailbox.
+    Spam,
+    /// Move to a mailbox.
+    MoveTo(MailboxId),
+    /// Add a label (`member: true`) or remove one.
+    SetMailbox {
+        /// The mailbox used as a label.
+        mailbox: MailboxId,
+        /// Add or remove.
+        member: bool,
+    },
+}
+
+impl BatchStep {
+    /// Whether the step takes the mail out of its mailbox.
+    pub fn moves(&self) -> bool {
+        matches!(
+            self,
+            BatchStep::Archive | BatchStep::Trash | BatchStep::Spam | BatchStep::MoveTo(_)
+        )
+    }
+}
+
 /// A change to mail, applied optimistically by the shell.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Mutation {
@@ -596,6 +695,18 @@ pub enum Mutation {
     /// Destroy permanently. Only offered in Trash and Spam, after a
     /// confirm, because it cannot be undone.
     DeletePermanently(Target),
+    /// A macro: several changes to the same conversations, sent as one
+    /// change with one undo. Thread targets act on their messages in the
+    /// mailbox they were picked from, as moves do.
+    Batch {
+        /// What to change.
+        target: Target,
+        /// The changes, in order, with folders resolved to ids. At most one
+        /// of them moves the mail.
+        steps: Vec<BatchStep>,
+        /// The macro's label, for the undo entry and failure toasts.
+        label: String,
+    },
     /// Undo the last undoable mutation.
     Undo,
     /// Redo the last undone mutation.

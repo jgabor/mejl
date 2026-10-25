@@ -34,6 +34,8 @@ pub(crate) fn in_scope(action: Action, screen: Screen) -> bool {
         Category::Masked => screen == Screen::Masked,
         Category::Rules => screen == Screen::Rules,
         Category::Settings => screen == Screen::Settings,
+        Category::Keys => screen == Screen::Keys,
+        Category::Macros => screen == Screen::Mail,
         Category::Navigate | Category::Select | Category::Triage | Category::Read => {
             screen == Screen::Mail
         }
@@ -56,6 +58,8 @@ fn category_tag(c: Category) -> &'static str {
         Category::Masked => "masked",
         Category::Rules => "rules",
         Category::Settings => "settings",
+        Category::Keys => "keys",
+        Category::Macros => "macro",
     }
 }
 
@@ -121,6 +125,20 @@ impl AppState {
                     .tag(category_tag(a.category()))
             })
             .collect();
+        if self.screen == Screen::Mail {
+            for (i, m) in self.config.macros.iter().enumerate() {
+                let id = crate::macros::MacroId(u16::try_from(i).unwrap_or(u16::MAX));
+                let keys = keymap
+                    .keys_for_macro(id, &contexts)
+                    .map(|k| k.to_string())
+                    .unwrap_or_default();
+                items.push(
+                    PickItem::new(format!("Macro: {}", m.label), PickValue::Macro(id))
+                        .key(keys)
+                        .tag(category_tag(Category::Macros)),
+                );
+            }
+        }
         let go = key(Action::GoMailbox);
         for it in &self.sidebar {
             if let crate::state::SidebarItem::Mailbox { id, name, .. } = it {
@@ -196,7 +214,7 @@ impl AppState {
         self.overlays.push(Overlay::Picker(Box::new(p)));
     }
 
-    fn mailbox_path(&self, id: &MailboxId) -> String {
+    pub(crate) fn mailbox_path(&self, id: &MailboxId) -> String {
         let mut parts = Vec::new();
         let mut cur = Some(id.clone());
         let mut guard = 0;
@@ -626,6 +644,7 @@ impl AppState {
                 self.remember(a);
                 self.apply(data, a, None, cmds);
             }
+            PickValue::Macro(id) => self.run_macro(data, id, cmds),
             PickValue::Mailbox(id) => match kind {
                 PickerKind::MoveTo => {
                     if let Some(target) = target {
@@ -644,6 +663,7 @@ impl AppState {
                         );
                     }
                 }
+                PickerKind::MacroFolder => self.macro_folder_picked(id, cmds),
                 PickerKind::Label => {
                     let member = !item.checked.unwrap_or(false);
                     if let Some(Overlay::Picker(p)) = self.overlays.last_mut()
@@ -721,6 +741,7 @@ impl AppState {
             }
             PickValue::MaskState { id, state } => self.set_mask_state(data, &id, state, cmds),
             PickValue::Quit(choice) => self.quit_choice(choice, cmds),
+            PickValue::Keys(pick) => self.keys_pick(data, pick, cmds),
         }
     }
 
@@ -860,6 +881,7 @@ impl AppState {
             }
             PromptAction::RuleField(edit) => self.rule_field_answer(data, edit, answer, cmds),
             PromptAction::RulePaste => self.rule_paste_answer(data, &answer, cmds),
+            PromptAction::Keys(prompt) => self.keys_prompt_answer(prompt, answer, cmds),
         }
     }
 

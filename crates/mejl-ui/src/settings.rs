@@ -70,7 +70,9 @@ impl Row {
     pub fn help(self) -> &'static str {
         match self {
             Row::Theme => "terminal uses your terminal's colours; mono and high-contrast use none",
-            Row::Preset => "fastmail follows Fastmail's web shortcuts; vim follows aerc and vim",
+            Row::Preset => {
+                "fastmail follows Fastmail's web shortcuts, vim follows aerc; Enter edits keys"
+            }
             Row::Density => "compact drops date headings; relaxed shows a preview line",
             Row::PreferHtml => "show the HTML part when a message has both; V switches per message",
             Row::UndoSend => "how long a sent message waits so z can cancel it",
@@ -93,7 +95,7 @@ impl Row {
         };
         match self {
             Row::Theme => c.theme.name().to_owned(),
-            Row::Preset => c.keymap.preset_kind().name().to_owned(),
+            Row::Preset => c.keymap.name().to_owned(),
             Row::Density => c.density.name().to_owned(),
             Row::PreferHtml => on_off(c.prefer_html),
             Row::UndoSend => secs(c.undo_send),
@@ -126,11 +128,17 @@ impl Row {
                 let cur = names.iter().position(|n| *n == c.theme.name()).unwrap_or(0);
                 Setting::Theme(cycle(&names, names[cur], forward).to_owned())
             }
-            Row::Preset => Setting::Preset(cycle(
-                &[Preset::Fastmail, Preset::Vim],
-                c.keymap.preset_kind(),
-                forward,
-            )),
+            Row::Preset => {
+                let names = preset_names(c);
+                let cur = names.iter().position(|n| n == c.keymap.name()).unwrap_or(0);
+                let n = names.len();
+                let next = if forward {
+                    (cur + 1) % n
+                } else {
+                    (cur + n - 1) % n
+                };
+                Setting::Preset(names[next].clone())
+            }
             Row::Density => Setting::Density(cycle(&Density::ALL, c.density, forward)),
             Row::PreferHtml => Setting::PreferHtml(!c.prefer_html),
             Row::UndoSend => Setting::UndoSend(Duration::from_secs(cycle(
@@ -147,6 +155,16 @@ impl Row {
             ))),
         }
     }
+}
+
+/// Every preset name the Keys row cycles through: the built-in ones, then
+/// the user's own.
+pub fn preset_names(c: &UiConfig) -> Vec<String> {
+    Preset::ALL
+        .iter()
+        .map(|p| p.name().to_owned())
+        .chain(c.presets.iter().map(|p| p.name.clone()))
+        .collect()
 }
 
 fn on_off(b: bool) -> String {
@@ -171,7 +189,7 @@ mod tests {
         assert_eq!(Row::Theme.value(&c), "terminal");
         assert_eq!(Row::Theme.step(&c, true), Setting::Theme("mono".into()));
         assert_eq!(Row::Theme.step(&c, false), Setting::Theme("light".into()));
-        assert_eq!(Row::Preset.step(&c, true), Setting::Preset(Preset::Vim));
+        assert_eq!(Row::Preset.step(&c, true), Setting::Preset("vim".into()));
         assert_eq!(
             Row::Density.step(&c, true),
             Setting::Density(Density::Relaxed)

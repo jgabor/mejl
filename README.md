@@ -68,7 +68,7 @@ The config file is `config.toml` in mejl's config folder. On Linux that is `~/.c
 ```toml
 [ui]
 theme = "terminal"        # terminal, mono, high-contrast, dark or light
-preset = "fastmail"       # key preset: "fastmail" or "vim"
+preset = "fastmail"       # key preset: "fastmail", "vim" or one of your own
 density = "comfortable"   # compact, comfortable or relaxed
 undo_send_seconds = 10    # how long a sent message waits so you can undo it
 mark_read_delay_ms = 0    # wait before marking an opened message read
@@ -82,7 +82,7 @@ push = true               # new mail arrives over push
 poll_interval_secs = 300  # how often to check when push is down
 prefetch = 3              # bodies to fetch ahead of the cursor
 
-[keys.list]               # key overrides, per context
+[keys.list]               # key overrides on top of any preset, per context
 "ctrl-n" = "next"
 ```
 
@@ -108,6 +108,39 @@ The default keys follow Fastmail's web shortcuts, so they are what you know from
 | `q` | Back, then quit |
 
 Prefer vim keys? Set `preset = "vim"`.
+
+### Your own keys
+
+Open settings (`g ,`), go to the Keys row and press Enter. The key editor works like the controls screen of a game:
+
+1. A built-in preset cannot change, so press `d` to make your own copy of it and give it a name.
+2. Pick a command, press Enter, then press the new key. `a` adds a second key, `x` removes one, `u` puts the preset's key back.
+3. If the key already does something, mejl asks whether to swap the two keys, take the key, or cancel. Keys that would break a prefix such as `g` are refused with the reason.
+
+The Mail section changes the list and the reader together. Every change is written to the config file at once and works without a restart. Your preset stores only what you changed, so new commands in later versions of mejl get their default keys:
+
+```toml
+[presets.mine]
+base = "fastmail"
+[presets.mine.keys.list]
+"e" = "archive"
+"y" = "none"
+```
+
+`R` renames, `D` deletes and `p` switches presets. `mejl keys --check` checks every preset and macro.
+
+### Macros
+
+A macro makes several changes to the conversations under the cursor, or the selected ones, with one key. All its steps go to the server as one change, so one `z` undoes the whole macro. In the key editor, go to the Macros section and press `n`. Add steps with `a` (mark read or unread, pin or unpin, mute, add or remove a label, move to a folder, archive, trash, spam), reorder them with `K` and `J`, and bind a key with `b`. A macro moves the mail at most once and never sends or deletes anything for good.
+
+```toml
+[macros.file-receipt]
+label = "File receipt"
+keys = ["f2"]
+steps = ["mark-read", "unpin", { move = "Receipts" }]
+```
+
+Macro keys work in the list and the reader with every preset. A macro key that would break the active preset, such as `r` in vim, is skipped, and `mejl keys --check` says so.
 
 ## Rules
 

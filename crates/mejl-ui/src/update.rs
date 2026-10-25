@@ -8,6 +8,8 @@
 //! requested, and lays the reader document out again when needed.
 
 mod compose;
+mod keys;
+mod macros;
 mod masked;
 mod overlays;
 mod rules;
@@ -29,7 +31,7 @@ use crate::event::{
     Cmd, DataChange, Event, Keyword, Msg, Mutation, OutboxOutcome, Target, TargetIds, ToastLevel,
 };
 use crate::hit::{HitTarget, Pane};
-use crate::keymap::{Context, Key, KeyName, Resolution};
+use crate::keymap::{Binding, Context, Key, KeyName, Resolution};
 use crate::layout::{LayoutMode, MailLayout, Splitter, ratio_for_drag, sidebar_for_drag};
 use crate::picker::{PickItem, PickValue, Picker, PickerKind, QuitChoice};
 use crate::reader::{self, DocInput, DocMode, ReaderDoc};
@@ -209,6 +211,10 @@ impl AppState {
                 }
                 return;
             }
+            Some(Overlay::CaptureKey(_)) => {
+                self.capture_key(key, cmds);
+                return;
+            }
             Some(Overlay::Perf) => {
                 self.overlays.pop();
                 return;
@@ -234,6 +240,7 @@ impl AppState {
             Screen::Masked => self.masked_key(data, key, cmds),
             Screen::Rules => self.rules_key(data, key, cmds),
             Screen::Settings => false,
+            Screen::Keys => self.keys_key(key, cmds),
         };
         if used {
             return;
@@ -247,8 +254,10 @@ impl AppState {
         }
         let contexts = self.contexts();
         let res = self.config.keymap.feed(&mut self.pending, &contexts, key);
-        if let Resolution::Action { action, count } = res {
-            self.apply(data, action, count, cmds);
+        match res {
+            Resolution::Action { action, count } => self.apply(data, action, count, cmds),
+            Resolution::Macro { id } => self.run_macro(data, id, cmds),
+            _ => {}
         }
     }
 
@@ -308,6 +317,7 @@ impl AppState {
             Screen::Compose => self.compose_paste(data, text, cmds),
             Screen::Search => self.search_paste(data, text),
             Screen::Masked => self.masked_paste(text),
+            Screen::Keys => self.keys_paste(text),
             Screen::Mail | Screen::Rules | Screen::Settings => {}
         }
     }
@@ -343,6 +353,8 @@ impl AppState {
             ConfirmAction::DisableMasked { id } => {
                 self.set_mask_state(data, &id, crate::data::MaskedState::Disabled, cmds);
             }
+            ConfirmAction::DeletePreset { name } => self.delete_preset(name, cmds),
+            ConfirmAction::DeleteMacro { id } => self.delete_macro(id, cmds),
         }
     }
 
@@ -364,7 +376,7 @@ impl AppState {
         cmds: &mut Vec<Cmd>,
     ) {
         if action.is_repeatable() {
-            self.last_action = Some((action, count));
+            self.last_action = Some((Binding::Action(action), count));
         }
         if self.compose_action(data, action, cmds)
             || self.search_action(data, action, cmds)
@@ -411,11 +423,11 @@ impl AppState {
                 cmds.push(Cmd::RefreshNow);
                 self.notify("Syncing now", ToastLevel::Info, false, cmds);
             }
-            Action::Repeat => {
-                if let Some((a, c)) = self.last_action {
-                    self.apply(data, a, c, cmds);
-                }
-            }
+            Action::Repeat => match self.last_action {
+                Some((Binding::Action(a), c)) => self.apply(data, a, c, cmds),
+                Some((Binding::Macro(id), _)) => self.run_macro(data, id, cmds),
+                None => {}
+            },
             Action::NextPane => self.cycle_pane(&layout, true),
             Action::PrevPane => self.cycle_pane(&layout, false),
             Action::ToggleSidebar => self.toggle_sidebar(&layout),
@@ -610,6 +622,7 @@ impl AppState {
             Action::GoRules => self.open_rules(data, None),
             Action::GoMasked => self.open_masked(data, None),
             Action::GoSettings => self.open_settings(),
+            Action::EditKeys => self.open_keys(cmds),
             // Screen actions outside their screen do nothing.
             _ => {}
         }
@@ -762,6 +775,10 @@ impl AppState {
             }
             Screen::Masked | Screen::Rules | Screen::Settings => {
                 self.screen = Screen::Mail;
+                return true;
+            }
+            Screen::Keys => {
+                self.screen = self.keys.as_ref().map_or(Screen::Mail, |k| k.from);
                 return true;
             }
         }
@@ -940,7 +957,7 @@ impl AppState {
             Screen::Search => {
                 self.search = None;
             }
-            Screen::Masked | Screen::Rules | Screen::Settings => {}
+            Screen::Masked | Screen::Rules | Screen::Settings | Screen::Keys => {}
         }
         self.screen = Screen::Mail;
     }
@@ -1101,13 +1118,22 @@ impl AppState {
         let total = self.list.total;
         let from_mailbox = self.target_mailbox();
         if !sel.is_empty(total) {
-            let ids = if sel.is_all() && self.results.is_none() {
-                TargetIds::AllInMailbox {
+            let ids = match &self.results {
+                None if sel.is_all() => TargetIds::AllInMailbox {
                     mailbox: from_mailbox.clone()?,
                     except: sel.ids().cloned().collect(),
-                }
-            } else {
-                TargetIds::Threads(sel.ids().cloned().collect())
+                },
+                // Select all in search results: every result row, as
+                // `ids` holds the ones deselected since.
+                Some(results) if sel.is_all() => TargetIds::Threads(
+                    results
+                        .rows
+                        .iter()
+                        .map(|r| r.row.thread_id.clone())
+                        .filter(|t| sel.contains(t))
+                        .collect(),
+                ),
+                _ => TargetIds::Threads(sel.ids().cloned().collect()),
             };
             return Some((Target { ids, from_mailbox }, sel.count(total)));
         }
@@ -1365,12 +1391,16 @@ impl AppState {
         let target = self.hits.hit(x, y).cloned();
         if !self.pending.is_empty() {
             self.pending.clear();
-            if let Some(HitTarget::Action(a)) = target {
-                self.apply(data, a, None, cmds);
+            match target {
+                Some(HitTarget::Action(a)) => self.apply(data, a, None, cmds),
+                Some(HitTarget::Macro(id)) => self.run_macro(data, id, cmds),
+                _ => {}
             }
             return;
         }
-        if let Some(Overlay::Confirm(_) | Overlay::Prompt(_)) = self.overlays.last() {
+        if let Some(Overlay::Confirm(_) | Overlay::Prompt(_) | Overlay::CaptureKey(_)) =
+            self.overlays.last()
+        {
             self.overlays.pop();
             self.notify("Cancelled", ToastLevel::Info, false, cmds);
             return;
@@ -1437,6 +1467,7 @@ impl AppState {
                 }
             }
             HitTarget::Action(a) => self.apply(data, a, None, cmds),
+            HitTarget::Macro(id) => self.run_macro(data, id, cmds),
             HitTarget::Prefix(seq) => {
                 self.pending.clear();
                 self.pending.keys = seq.0;
@@ -1549,10 +1580,35 @@ impl AppState {
             Msg::ServerSearch { query, result } => self.server_results(query, result, cmds),
             Msg::MaskedCreated { draft_id, result } => self.masked_created(draft_id, result, cmds),
             Msg::Config(config) => self.apply_config(*config),
+            Msg::SettingRefused { error } => {
+                if let Some(s) = self.settings.as_mut() {
+                    s.saving = None;
+                }
+                self.keys_config_changed();
+                self.notify(
+                    format!("Not changed: {error}"),
+                    ToastLevel::Warning,
+                    false,
+                    cmds,
+                );
+            }
         }
     }
 
     fn apply_config(&mut self, config: crate::state::UiConfig) {
+        // A macro id is a place in the list, which a new or deleted macro
+        // shifts: Repeat follows the macro by its name, or forgets it.
+        if let Some((Binding::Macro(id), count)) = self.last_action {
+            let name = self
+                .config
+                .macros
+                .get(usize::from(id.0))
+                .map(|m| m.id.clone());
+            self.last_action = name
+                .and_then(|n| config.macros.iter().position(|m| m.id == n))
+                .and_then(|i| u16::try_from(i).ok())
+                .map(|i| (Binding::Macro(crate::macros::MacroId(i)), count));
+        }
         if let Some(s) = self.settings.as_mut() {
             s.saving = None;
         }
@@ -1564,6 +1620,7 @@ impl AppState {
         self.pending.clear();
         self.reader.dirty = true;
         self.list.pages.invalidate();
+        self.keys_config_changed();
     }
 
     fn data_changed(&mut self, data: &dyn MailData, change: &DataChange) {

@@ -51,7 +51,10 @@ pub(crate) fn bulk(
         let result = (|| {
             let roles = RoleMailboxes::from_rows(&ctx.reader()?.mailboxes()?);
             let patch = action.patch(&mailbox, &roles).ok_or_else(|| {
-                SyncError::Invalid("there is no mailbox to move this mail to".into())
+                SyncError::Invalid(match action {
+                    BulkAction::Patch(_) => "nothing to change".into(),
+                    _ => "there is no mailbox to move this mail to".into(),
+                })
             })?;
             let ids = ctx
                 .store

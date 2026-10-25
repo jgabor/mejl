@@ -290,3 +290,36 @@ fn save_prompt_cancels() {
     assert!(hs.state.overlays().is_empty());
     assert_eq!(*hs.state.screen(), Screen::Search);
 }
+
+#[test]
+fn select_all_in_results_targets_every_result_but_the_deselected() {
+    let mut hs = synced(160, 40);
+    hs.keys("/");
+    typed(&mut hs, "larkspur");
+    hs.keys("enter");
+    hs.event(Event::Msg(Msg::ServerSearch {
+        query: "larkspur".into(),
+        result: Ok(Vec::new()),
+    }));
+    hs.keys("down enter");
+    let results = hs.state.list().total();
+    assert!(results >= 2, "{results}");
+    hs.keys("* a");
+    // Deselect the row under the cursor.
+    let skipped = hs.state.list().cursor_thread().cloned().unwrap();
+    hs.keys("x");
+    let cmds = hs.keys("y");
+    let targets: Vec<Vec<mejl_ui::ThreadId>> = cmds
+        .iter()
+        .filter_map(|c| match c {
+            Cmd::Mutate(mejl_ui::Mutation::Archive(t)) => match &t.ids {
+                mejl_ui::TargetIds::Threads(ids) => Some(ids.clone()),
+                _ => None,
+            },
+            _ => None,
+        })
+        .collect();
+    assert_eq!(targets.len(), 1, "{cmds:?}");
+    assert_eq!(targets[0].len(), results - 1, "{cmds:?}");
+    assert!(!targets[0].contains(&skipped), "{cmds:?}");
+}

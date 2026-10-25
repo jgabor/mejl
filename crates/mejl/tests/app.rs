@@ -1524,7 +1524,7 @@ fn ctrl_z_suspends_from_every_context_and_redraws_at_the_new_size() {
 #[test]
 fn ctrl_z_suspends_with_the_vim_preset() {
     let mut config = Config::default();
-    config.ui.preset = mejl::config::Preset::Vim;
+    config.ui.preset = "vim".into();
     let mut hs = Harness::synced_with(
         Setup {
             config,
@@ -1770,4 +1770,34 @@ fn send_now_quits_after_a_few_seconds_when_the_network_is_slow() {
     // The engine may not stop cleanly with a request hanging; that is fine
     // here, the send stays in the outbox for the next start.
     let _ = hs.app.close().shutdown();
+}
+
+#[test]
+fn the_key_editor_duplicates_rebinds_and_the_new_key_works_without_a_restart() {
+    let mut hs = Harness::synced(160, 40);
+    hs.keys("g , j enter");
+    assert_eq!(*hs.app.state().screen(), Screen::Keys);
+    hs.wait_text("the key editor", "Preset: fastmail (built in)");
+    // Duplicate the built-in preset under the offered name.
+    hs.keys("d enter");
+    hs.wait_text("the copy", "Preset: fastmail-custom (based on fastmail)");
+    // Archive moves from y to Ctrl-g, in the list and the reader.
+    hs.key("/");
+    hs.type_text("archive");
+    hs.keys("enter enter ctrl-g");
+    hs.wait("the rebind", |hs| {
+        let keymap = &hs.app.state().config().keymap;
+        keymap.keys_for(mejl_ui::Action::Archive, &[mejl_ui::Context::List])
+            == Some("ctrl-g".parse().unwrap())
+    });
+    let text = std::fs::read_to_string(hs._dir.path().join("config.toml")).unwrap();
+    assert!(text.contains("preset = \"fastmail-custom\""), "{text}");
+    assert!(text.contains("[presets.fastmail-custom]"), "{text}");
+    assert!(text.contains("base = \"fastmail\""), "{text}");
+    assert!(text.contains("ctrl-g = \"archive\""), "{text}");
+    assert!(text.contains("y = \"none\""), "{text}");
+    hs.keys("esc esc esc");
+    assert_eq!(*hs.app.state().screen(), Screen::Mail);
+    archive_and_undo(&mut hs, "ctrl-g", false);
+    hs.quit();
 }

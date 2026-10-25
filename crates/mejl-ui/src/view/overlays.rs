@@ -5,9 +5,9 @@ use std::time::Duration;
 use ratatui::layout::Rect;
 
 use super::{MailView, Painter};
-use crate::action::{Action, Category};
+use crate::action::Category;
 use crate::hit::HitTarget;
-use crate::keymap::{Context, ContinuationTarget, KeySeq};
+use crate::keymap::{Binding, Context, ContinuationTarget, KeySeq};
 use crate::perf::BUCKETS_MS;
 use crate::state::HelpState;
 use crate::text::{fit, truncate, width};
@@ -59,6 +59,11 @@ impl MailView<'_> {
                         other => other,
                     }),
                     HitTarget::Action(*a),
+                ),
+                ContinuationTarget::Macro(id) => (
+                    km.macro_label(*id).to_owned(),
+                    Some(Category::Macros),
+                    HitTarget::Macro(*id),
                 ),
                 ContinuationTarget::Prefix(label) => {
                     let mut next = prefix.clone();
@@ -281,9 +286,9 @@ impl MailView<'_> {
             vec![help.context, Context::Global]
         };
         let filter = help.filter.to_lowercase();
-        let mut rows: Vec<(Category, String, Action)> = Vec::new();
+        let mut rows: Vec<(Category, String, Binding)> = Vec::new();
         for (ci, ctx) in contexts.iter().enumerate() {
-            for (seq, action) in km.bindings(*ctx) {
+            for (seq, binding) in km.bindings(*ctx) {
                 // Skip bindings an earlier context hides.
                 let hidden = contexts[..ci].iter().any(|earlier| {
                     km.bindings(*earlier)
@@ -295,23 +300,25 @@ impl MailView<'_> {
                 }
                 let keys = seq.to_string();
                 if !filter.is_empty() {
+                    // A macro also matches "macro", as its help row says.
                     let hay = format!(
-                        "{keys} {} {} {}",
-                        action.name(),
-                        action.label(),
-                        action.description()
+                        "{keys} {} {} {} {}",
+                        km.binding_name(binding),
+                        km.binding_label(binding),
+                        km.binding_description(binding),
+                        km.binding_category(binding).label()
                     )
                     .to_lowercase();
                     if !hay.contains(&filter) {
                         continue;
                     }
                 }
-                match rows.iter_mut().find(|(_, _, a)| *a == action) {
+                match rows.iter_mut().find(|(_, _, b)| *b == binding) {
                     Some(row) => {
                         row.1.push_str(", ");
                         row.1.push_str(&keys);
                     }
-                    None => rows.push((action.category(), keys, action)),
+                    None => rows.push((km.binding_category(binding), keys, binding)),
                 }
             }
         }
@@ -342,7 +349,7 @@ impl MailView<'_> {
             }
         }
         let mut last_cat = None;
-        for (cat, keys, action) in &rows {
+        for (cat, keys, binding) in &rows {
             if last_cat != Some(*cat) {
                 if last_cat.is_some() || !body.is_empty() {
                     lines.push(Vec::new());
@@ -351,12 +358,19 @@ impl MailView<'_> {
                 last_cat = Some(*cat);
             }
             let key_w = 14usize;
-            let name = action.name();
-            let desc_w = usize::from(inner.width).saturating_sub(key_w + width(name) + 3);
+            let name = match binding {
+                Binding::Action(a) => a.name().to_owned(),
+                Binding::Macro(id) => km.macro_label(*id).to_owned(),
+            };
+            let desc = match binding {
+                Binding::Action(a) => a.description().to_owned(),
+                Binding::Macro(_) => format!("Macro: {}", km.binding_description(*binding)),
+            };
+            let desc_w = usize::from(inner.width).saturating_sub(key_w + width(&name) + 3);
             lines.push(vec![
                 (fit(keys, key_w, ell), StyleName::HintKey),
                 (" ".to_owned(), StyleName::Text),
-                (fit(action.description(), desc_w, ell), StyleName::Text),
+                (fit(&desc, desc_w, ell), StyleName::Text),
                 (format!("  {name}"), StyleName::Dim),
             ]);
         }

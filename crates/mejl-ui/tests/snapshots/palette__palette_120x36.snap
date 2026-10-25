@@ -36,5 +36,5 @@ expression: hs.text()
 │     Bea Kowalski (2) Re: Running club route      Sep 27 │                                                            │
 │   @ Calder Insurance Policy documents            Sep 25 │                                                            │
 └─────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────┘
- 5 of 119 commands match "new"                                                                   ✓ synced via JMAP push 
+ 5 of 120 commands match "new"                                                                   ✓ synced via JMAP push 
  Up/Down move  Enter run  Tab complete  ^n/^p next/prev  Esc close

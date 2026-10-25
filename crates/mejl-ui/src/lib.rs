@@ -71,7 +71,7 @@
 //! # Screens
 //!
 //! [`Screen`] is the mail screen (with search results shown as a list),
-//! compose, search, Masked Email, rules and settings. Modal layers are
+//! compose, search, Masked Email, rules, settings and the key editor. Modal layers are
 //! [`Overlay`]s: help, confirms, one-line prompts, and pickers (the command
 //! palette, move and label pickers, the From picker, links, copy, actions
 //! and Masked Email menus). The top overlay gets keys first. A focused text
@@ -102,6 +102,7 @@
 //! | `RecordRuleRender { sieve, body_sha256 }` | Records the copy for the paste check | `DataChanged { rules: true }` |
 //! | `ConfirmRulePaste { render_id }` | Marks that copy as confirmed on Fastmail | `DataChanged { rules: true }` |
 //! | `SaveSetting(s)` | Writes the config file, rebuilds the whole [`UiConfig`] (theme, keymap with overrides) | [`Msg::Config`] |
+//! | `EditKeys(e)` | Writes a custom preset or macro change to the config file, rebuilds the whole [`UiConfig`]; nothing changes unless the new file loads | [`Msg::Config`] or [`Msg::SettingRefused`] |
 //! | `Suspend` | Restores the terminal, stops the process (SIGTSTP), and after `fg` enters the TUI again and redraws everything | `Event::Resize` with the size then |
 //! | `SendNowAndQuit(ids)` | Ends the undo send window of those sends, quits once they are sent or after a few seconds; a failed send cancels the quit | [`Msg::Send`] |
 //!
@@ -115,6 +116,10 @@
 //! [`event`]. The UI asks for wake-ups with [`Cmd::WakeAt`] for toasts,
 //! the undo send countdown, draft autosave and a delayed mark-read;
 //! [`AppState::next_wakeup`] gives the earliest one.
+//!
+//! `Mutation::Batch` runs a macro: its steps change the same mail, in
+//! order, and the shell queues them as one change with one undo entry. With
+//! `* a` it goes through the engine's bulk path as one patch per email.
 //!
 //! # The shell's side of each read
 //!
@@ -154,7 +159,9 @@ pub mod fuzzy;
 pub mod hit;
 pub mod input;
 pub mod keymap;
+pub mod keys_screen;
 pub mod layout;
+pub mod macros;
 pub mod masked;
 pub mod perf;
 pub mod picker;
@@ -180,13 +187,16 @@ pub use data::{
 };
 
 pub use event::{
-    Cmd, DataChange, Event, FrameSample, Keyword, Msg, Mutation, OutboxOutcome, OutboxReport,
-    PaneSizes, PushState, RenderRequest, SendOutcome, SendReport, Setting, SyncStatus, Target,
-    TargetIds, ToastLevel, render_body,
+    BatchStep, Cmd, DataChange, Event, FrameSample, KeysEdit, Keyword, Msg, Mutation,
+    OutboxOutcome, OutboxReport, PaneSizes, PushState, RenderRequest, SendOutcome, SendReport,
+    Setting, SyncStatus, Target, TargetIds, ToastLevel, render_body,
 };
 pub use hit::{HitMap, HitTarget, Pane};
-pub use keymap::{Context, Key, KeyOverrides, KeySeq, Keymap, KeymapError, Preset};
+pub use keymap::{
+    Binding, Context, Key, KeyOverrides, KeySeq, Keymap, KeymapError, KeymapSpec, Preset,
+};
 pub use layout::{LayoutMode, LayoutPref};
+pub use macros::{FolderRef, Macro, MacroError, MacroId, Step};
 pub use state::{AppState, Density, DraftSync, Focus, Overlay, Screen, UiConfig};
 pub use state::{Confirm, ConfirmAction, Prompt, PromptAction};
 pub use theme::{StyleName, Theme};

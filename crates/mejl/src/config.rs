@@ -13,7 +13,7 @@
 //! | `accounts.<name>.username` | none | Shown in the UI only. Never sent anywhere |
 //! | `accounts.<name>.token_command` | none | Command that prints the token, for systems without a keyring |
 //! | `ui.theme` | `terminal` | Built-in theme name, or `auto:<name>` |
-//! | `ui.preset` | `fastmail` | Key preset: `fastmail` or `vim` |
+//! | `ui.preset` | `fastmail` | Key preset: `fastmail`, `vim`, or the name of a custom preset |
 //! | `ui.density` | `comfortable` | List density: `compact`, `comfortable` or `relaxed` |
 //! | `ui.prefer_html` | `false` | Show the HTML part when a message has both |
 //! | `ui.undo_send_seconds` | `10` | Hold sent mail this long so it can be undone (0 to 300) |
@@ -21,7 +21,10 @@
 //! | `ui.mark_read_on_archive` | `false` | Archiving a conversation also marks it read |
 //! | `ui.remote_images` | `off` | `off` or `on` |
 //! | `ui.mouse` | `true` | Capture the mouse. `false` keeps the terminal's own text selection |
-//! | `keys` | empty | Key overrides, `[keys.<context>] "key" = "action"`, checked by the UI |
+//! | `keys` | empty | Key overrides on top of any preset, `[keys.<context>] "key" = "action"`, checked by the UI |
+//! | `presets.<name>.base` | `fastmail` | The built-in preset a custom preset changes |
+//! | `presets.<name>.keys` | empty | A custom preset's changes, same syntax as `[keys]` |
+//! | `macros.<name>` | none | A macro: `label`, `keys` and `steps`, checked by the UI |
 //! | `sync.push` | `true` | Use EventSource push |
 //! | `sync.poll_interval_secs` | `300` | Poll this often when push is off or down (30 to 86400) |
 //! | `sync.prefetch` | `3` | Bodies to prefetch around the cursor (0 to 50) |
@@ -59,8 +62,31 @@ pub struct Config {
     pub ui: UiSettings,
     /// Raw key overrides, passed to the UI keymap as they are.
     pub keys: toml::Table,
+    /// Custom key presets by name.
+    pub presets: BTreeMap<String, PresetConfig>,
+    /// Raw macros, passed to the UI as they are.
+    pub macros: toml::Table,
     /// Sync settings.
     pub sync: SyncSettings,
+}
+
+/// A custom key preset: a built-in base and its own overrides.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(default)]
+pub struct PresetConfig {
+    /// The built-in preset it changes.
+    pub base: Preset,
+    /// Raw key overrides, as in `[keys]`.
+    pub keys: toml::Table,
+}
+
+impl Default for PresetConfig {
+    fn default() -> Self {
+        PresetConfig {
+            base: Preset::Fastmail,
+            keys: toml::Table::new(),
+        }
+    }
 }
 
 impl Default for Config {
@@ -70,6 +96,8 @@ impl Default for Config {
             accounts: BTreeMap::new(),
             ui: UiSettings::default(),
             keys: toml::Table::new(),
+            presets: BTreeMap::new(),
+            macros: toml::Table::new(),
             sync: SyncSettings::default(),
         }
     }
@@ -113,7 +141,7 @@ impl AccountConfig {
     }
 }
 
-/// Key presets.
+/// Built-in key presets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Preset {
@@ -122,6 +150,24 @@ pub enum Preset {
     Fastmail,
     /// Vim-style keys.
     Vim,
+}
+
+impl Preset {
+    /// Every built-in preset.
+    pub const ALL: [Preset; 2] = [Preset::Fastmail, Preset::Vim];
+
+    /// The config name.
+    pub fn name(self) -> &'static str {
+        match self {
+            Preset::Fastmail => "fastmail",
+            Preset::Vim => "vim",
+        }
+    }
+
+    /// The built-in preset with this name.
+    pub fn from_name(name: &str) -> Option<Preset> {
+        Preset::ALL.into_iter().find(|p| p.name() == name)
+    }
 }
 
 /// Message list density.
@@ -157,8 +203,8 @@ pub const BUILTIN_THEMES: &[&str] = &["terminal", "mono", "high-contrast", "dark
 pub struct UiSettings {
     /// Theme name.
     pub theme: String,
-    /// Key preset.
-    pub preset: Preset,
+    /// Key preset: a built-in name or a key of `[presets]`.
+    pub preset: String,
     /// List density.
     pub density: Density,
     /// Show the HTML part when a message has both.
@@ -179,7 +225,7 @@ impl Default for UiSettings {
     fn default() -> Self {
         UiSettings {
             theme: "terminal".to_owned(),
-            preset: Preset::Fastmail,
+            preset: Preset::Fastmail.name().to_owned(),
             density: Density::Comfortable,
             prefer_html: false,
             undo_send_seconds: 10,
@@ -385,7 +431,16 @@ fn at(text: &str, span: Range<usize>, message: String) -> Diagnostic {
     }
 }
 
-const TOP_KEYS: &[&str] = &["default_account", "accounts", "ui", "keys", "sync"];
+const TOP_KEYS: &[&str] = &[
+    "default_account",
+    "accounts",
+    "ui",
+    "keys",
+    "presets",
+    "macros",
+    "sync",
+];
+const PRESET_KEYS: &[&str] = &["base", "keys"];
 const ACCOUNT_KEYS: &[&str] = &["session_url", "username", "token_command"];
 const UI_KEYS: &[&str] = &[
     "theme",
@@ -407,6 +462,14 @@ fn check_unknown_keys(text: &str, doc: &DeTable<'_>, warnings: &mut Vec<Diagnost
             if let DeValue::Table(account) = value.get_ref() {
                 let prefix = format!("accounts.{}.", name.get_ref());
                 unknown_in(text, account, &prefix, ACCOUNT_KEYS, warnings);
+            }
+        }
+    }
+    if let Some(DeValue::Table(presets)) = doc.get("presets").map(Spanned::get_ref) {
+        for (name, value) in presets.iter() {
+            if let DeValue::Table(preset) = value.get_ref() {
+                let prefix = format!("presets.{}.", name.get_ref());
+                unknown_in(text, preset, &prefix, PRESET_KEYS, warnings);
             }
         }
     }
@@ -524,6 +587,34 @@ fn validate(
         config.sync.body_cache_mb,
         16..=65_536,
     );
+
+    for name in config.presets.keys() {
+        if Preset::from_name(name).is_some() || !mejl_ui::macros::valid_id(name) {
+            errors.push(at(
+                text,
+                span_of(doc, &["presets", name.as_str()]),
+                format!(
+                    "preset name `{name}` must be lowercase letters, digits and dashes, and not \
+                     `fastmail` or `vim`"
+                ),
+            ));
+        }
+    }
+    if Preset::from_name(&config.ui.preset).is_none()
+        && !config.presets.contains_key(&config.ui.preset)
+    {
+        let mut known: Vec<&str> = Preset::ALL.iter().map(|p| p.name()).collect();
+        known.extend(config.presets.keys().map(String::as_str));
+        errors.push(at(
+            text,
+            span_of(doc, &["ui", "preset"]),
+            format!(
+                "`ui.preset` is {:?}, which is not a preset; use one of: {}",
+                config.ui.preset,
+                known.join(", ")
+            ),
+        ));
+    }
 
     if !theme_is_known(&config.ui.theme) {
         warnings.push(at(
@@ -685,7 +776,7 @@ pub fn example_config() -> String {
 [ui]
 # Built-in themes: {themes}. "auto:<name>" picks a light or dark variant.
 # theme = "{theme}"
-# Key preset: "fastmail" or "vim".
+# Key preset: "fastmail", "vim", or the name of a preset under [presets].
 # preset = "fastmail"
 # List density: "compact", "comfortable" or "relaxed".
 # density = "comfortable"
@@ -707,6 +798,20 @@ pub fn example_config() -> String {
 # [keys.list]
 # "ctrl-n" = "next"
 # "j" = "none"
+
+# A custom preset: a built-in base and your changes. The key editor
+# (settings, Enter on Keys) writes these for you.
+# [presets.mine]
+# base = "fastmail"
+# [presets.mine.keys.list]
+# "e" = "archive"
+
+# A macro: changes to the selected conversations, sent as one change and
+# undone with one undo.
+# [macros.file-receipt]
+# label = "File receipt"
+# keys = ["F2"]
+# steps = ["mark-read", "unpin", {{ move = "Receipts" }}]
 
 [sync]
 # Use EventSource push for new mail.
@@ -796,7 +901,7 @@ body_cache_mb = 512
         let home = &c.accounts["home"];
         assert_eq!(home.session_url, FASTMAIL_SESSION_URL);
         assert_eq!(home.token_command.as_deref(), Some("pass show mejl"));
-        assert_eq!(c.ui.preset, Preset::Vim);
+        assert_eq!(c.ui.preset, "vim");
         assert_eq!(c.ui.density, Density::Compact);
         assert_eq!(c.ui.remote_images, RemoteImages::On);
         assert!(!c.ui.mouse);
@@ -852,6 +957,29 @@ body_cache_mb = 512
         assert_eq!(e[0].column, 9, "{e:?}");
         let e = errors("[sync]\nprefetch = -1\n");
         assert_eq!(e[0].line, 2, "{e:?}");
+    }
+
+    #[test]
+    fn custom_presets_and_macros_load() {
+        let loaded = parse(
+            "[ui]\npreset = \"mine\"\n\
+             [presets.mine]\nbase = \"vim\"\ncolour = 1\n[presets.mine.keys.list]\ne = \"archive\"\n\
+             [macros.tidy]\nsteps = [\"mark-read\"]\n",
+        )
+        .unwrap();
+        let c = loaded.config;
+        assert_eq!(c.ui.preset, "mine");
+        assert_eq!(c.presets["mine"].base, Preset::Vim);
+        assert!(c.presets["mine"].keys.contains_key("list"));
+        assert!(c.macros.contains_key("tidy"));
+        assert_eq!(loaded.warnings.len(), 1, "{:?}", loaded.warnings);
+        assert!(loaded.warnings[0].message.contains("presets.mine.colour"));
+        let e = errors("[ui]\npreset = \"ours\"\n[presets.mine]\n");
+        assert!(e[0].message.contains("fastmail, vim, mine"), "{e:?}");
+        let e = errors("[presets.vim]\nbase = \"fastmail\"\n");
+        assert!(e[0].message.contains("not `fastmail` or `vim`"), "{e:?}");
+        let e = errors("[presets.Mine]\n");
+        assert!(e[0].message.contains("lowercase"), "{e:?}");
     }
 
     #[test]

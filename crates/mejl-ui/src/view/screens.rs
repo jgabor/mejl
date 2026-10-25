@@ -1541,7 +1541,7 @@ impl MailView<'_> {
             ],
             _ => vec![
                 pair(Action::Next, Action::Prev, "move", true),
-                one(Action::SettingChange, "change", "change", true),
+                one(Action::SettingOpen, "change", "change", true),
                 Some(Hint {
                     keys: "Left/Right".into(),
                     label: "previous/next",

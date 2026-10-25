@@ -20,7 +20,7 @@ use super::{
     MailboxView, MaskedEmailView, MessageSummary, Page, Participant, RuleJson, RuleRenderView,
     SavedSearchView, SearchHit, SearchIssue, SearchIssueKind, SearchResults, ThreadId,
 };
-use crate::event::{DataChange, Keyword, Mutation, Target, TargetIds};
+use crate::event::{BatchStep, DataChange, Keyword, Mutation, Target, TargetIds};
 
 /// Counters of what the UI read, for tests that check virtualisation.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -458,6 +458,9 @@ impl MemoryData {
                         (t, false)
                     }
                     Mutation::MoveTo { target, .. } => (target, false),
+                    // Like the shell: a conversation changes its messages in
+                    // the mailbox it was picked from.
+                    Mutation::Batch { target, .. } => (target, false),
                     Mutation::Undo | Mutation::Redo | Mutation::DeletePermanently(_) => {
                         return DataChange::default();
                     }
@@ -491,6 +494,13 @@ impl MemoryData {
     }
 
     fn change(&mut self, index: usize, mutation: &Mutation, from: Option<&MailboxId>) {
+        if let Mutation::Batch { target, steps, .. } = mutation {
+            for step in steps {
+                let one = batch_step_mutation(target, step);
+                self.change(index, &one, from);
+            }
+            return;
+        }
         let role_box = |role| self.mailbox_for_role(role);
         let archive = role_box(MailboxRole::Archive);
         let trash = role_box(MailboxRole::Trash);
@@ -538,7 +548,10 @@ impl MemoryData {
                     state.mailboxes.remove(mailbox);
                 }
             }
-            Mutation::DeletePermanently(_) | Mutation::Undo | Mutation::Redo => {}
+            Mutation::DeletePermanently(_)
+            | Mutation::Batch { .. }
+            | Mutation::Undo
+            | Mutation::Redo => {}
         }
     }
 
@@ -1140,6 +1153,30 @@ impl MailData for MemoryData {
                 }
             })
             .collect()
+    }
+}
+
+/// One step of a batch as the single mutation it stands for.
+fn batch_step_mutation(target: &Target, step: &BatchStep) -> Mutation {
+    let target = target.clone();
+    match step {
+        BatchStep::Keyword { keyword, value } => Mutation::SetKeyword {
+            target,
+            keyword: *keyword,
+            value: *value,
+        },
+        BatchStep::Archive => Mutation::Archive(target),
+        BatchStep::Trash => Mutation::Trash(target),
+        BatchStep::Spam => Mutation::ReportSpam(target),
+        BatchStep::MoveTo(mailbox) => Mutation::MoveTo {
+            target,
+            mailbox: mailbox.clone(),
+        },
+        BatchStep::SetMailbox { mailbox, member } => Mutation::SetMailbox {
+            target,
+            mailbox: mailbox.clone(),
+            member: *member,
+        },
     }
 }
 

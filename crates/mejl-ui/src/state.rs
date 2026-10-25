@@ -7,7 +7,7 @@
 //!
 //! [`Screen`] says which screen is shown. Each screen other than mail keeps
 //! its own state in an `Option` field of [`AppState`] (compose, search,
-//! Masked Email, rules, settings), so leaving a screen and coming back can
+//! Masked Email, rules, settings, the key editor), so leaving a screen and coming back can
 //! keep what was typed. Modal pieces (help, confirms, prompts, the palette
 //! and every picker) are [`Overlay`]s; the top one gets the keys.
 
@@ -47,6 +47,14 @@ use crate::theme::Theme;
 pub struct UiConfig {
     /// Key bindings.
     pub keymap: Keymap,
+    /// The user's custom presets, for the key editor. The active one is
+    /// the one [`Keymap::name`] names.
+    pub presets: Vec<crate::keymap::CustomPreset>,
+    /// The top-level `[keys]` overrides, applied on top of any preset.
+    pub user_keys: crate::keymap::KeyOverrides,
+    /// The user's macros. A [`MacroId`](crate::macros::MacroId) is an index
+    /// into this list.
+    pub macros: Vec<crate::macros::Macro>,
     /// Styles and glyphs.
     pub theme: Theme,
     /// Pane arrangement.
@@ -117,6 +125,9 @@ impl Default for UiConfig {
     fn default() -> Self {
         UiConfig {
             keymap: Keymap::default(),
+            presets: Vec::new(),
+            user_keys: crate::keymap::KeyOverrides::default(),
+            macros: Vec::new(),
             theme: Theme::default(),
             layout: LayoutPref::Auto,
             hints: true,
@@ -153,6 +164,8 @@ pub enum Screen {
     Rules,
     /// Settings.
     Settings,
+    /// The key binding and macro editor.
+    Keys,
 }
 
 /// Which pane has focus on the mail screen.
@@ -180,6 +193,9 @@ pub enum Overlay {
     Picker(Box<Picker>),
     /// A one-line text question in the status line.
     Prompt(Prompt),
+    /// Reads the next key press raw, for the key editor. It gets every
+    /// key before the keymap, so any key can be bound.
+    CaptureKey(crate::keys_screen::Capture),
 }
 
 /// A pending text question.
@@ -222,6 +238,8 @@ pub enum PromptAction {
     RuleField(crate::rules::FieldEdit),
     /// The user's pasted Sieve script, for the paste check.
     RulePaste,
+    /// A name the key editor asked for.
+    Keys(crate::keys_screen::KeysPrompt),
 }
 
 /// State of the help overlay.
@@ -268,6 +286,16 @@ pub enum ConfirmAction {
     /// Delete a rule.
     DeleteRule {
         /// Rule id.
+        id: String,
+    },
+    /// Delete a custom key preset.
+    DeletePreset {
+        /// The preset's name.
+        name: String,
+    },
+    /// Delete a macro.
+    DeleteMacro {
+        /// The macro's id.
         id: String,
     },
 }
@@ -775,7 +803,7 @@ pub struct AppState {
     pub(crate) drag: Option<Splitter>,
     pub(crate) last_click: Option<(Timestamp, u16, u16)>,
     pub(crate) hits: HitMap,
-    pub(crate) last_action: Option<(Action, Option<u32>)>,
+    pub(crate) last_action: Option<(crate::keymap::Binding, Option<u32>)>,
     pub(crate) terminal_focused: bool,
     pub(crate) compose: Option<Box<ComposeState>>,
     pub(crate) search: Option<Box<SearchState>>,
@@ -783,6 +811,7 @@ pub struct AppState {
     pub(crate) masked: Option<Box<MaskedScreen>>,
     pub(crate) rules: Option<Box<RulesScreen>>,
     pub(crate) settings: Option<SettingsScreen>,
+    pub(crate) keys: Option<Box<crate::keys_screen::KeysScreen>>,
     pub(crate) sends: Vec<PendingSend>,
     pub(crate) recent: Vec<Action>,
     pub(crate) draft_counter: u64,
@@ -835,6 +864,7 @@ impl AppState {
             masked: None,
             rules: None,
             settings: None,
+            keys: None,
             sends: Vec::new(),
             recent: Vec::new(),
             draft_counter: 0,
@@ -1013,7 +1043,7 @@ impl AppState {
         }
         if matches!(
             self.overlays.last(),
-            Some(Overlay::Confirm(_) | Overlay::Prompt(_))
+            Some(Overlay::Confirm(_) | Overlay::Prompt(_) | Overlay::CaptureKey(_))
         ) {
             return None;
         }
@@ -1099,6 +1129,7 @@ impl AppState {
             Screen::Masked => return vec![Context::Masked, Context::Global],
             Screen::Rules => return vec![Context::Rules, Context::Global],
             Screen::Settings => return vec![Context::Settings, Context::Global],
+            Screen::Keys => return vec![Context::Keys, Context::Global],
         }
         let pane = match self.focus {
             Focus::Sidebar => Context::Sidebar,

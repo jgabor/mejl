@@ -1,0 +1,40 @@
+---
+source: crates/mejl-ui/tests/keys_editor.rs
+expression: hs.text()
+---
+ mejl   mira@example.org   Key bindings                                                      written to the config file 
+┌─ Keys ───────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ Preset: fastmail (built in)                                                                                          │
+│ Mail  List only  Reader only  Global  Compose  Search  Sidebar  Masked  Rules  Settings  Help  Keys  Macros          │
+│                                                                                                                      │
+│  Move                                                                                                                │
+│▸   Bottom of list        G  End                    Jump to the last conversation                                     │
+│  Go to                                                                                                               │
+│    Inbox                 g i                       Go to the inbox                                                   │
+│    Archive               g a                       Go to the archive                                                 │
+│    Sent                  g s                       Go to sent mail                                                   │
+│    Drafts                g d                       Go to drafts                                                      │
+│    Trash                 g t                       Go to trash                                                       │
+│    Spam                  g j                       Go to spam                                                        │
+│    Pick a mailbox        g f                       Pick a mailbox from the list                                      │
+│    Top of list           Home  g g                 Jump to the first conversation                                    │
+│  mejl tools                                                                                                          │
+│    Performance           g p                       Show frame timings                                                │
+│    Rules (Sieve)         g r                       Open the rules manager                                            │
+│    Masked Email          g m                       Open the Masked Email manager                                     │
+│    Settings              g ,                       Open settings                                                     │
+│    Key bindings          no key                    Edit key bindings                                                 │
+│  Read and reply                                                                                                      │
+│    Compose               c                         Write a new message                                               │
+│  App                                                                                                                 │
+│    Help                  ?                         Show the keys for this screen                                     │
+│    Commands              :  ^k  ^p                 Open the command palette                                          │
+│    Search                /                         Search mail                                                       │
+│    Back                  u  Esc                    Go back one level: close an overlay, leave the reader             │
+│    Quit                  q                         Go back, or quit at the top level                                 │
+│    Quit now              Q                         Quit at once                                                      │
+│ Bottom of list: Jump to the last conversation                                                                        │
+│ fastmail is built in. Press d to make your own copy.                                                                 │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+                                                                                                 ✓ synced via JMAP push 
+ j/k move  d duplicate to edit  p switch preset  Tab section  / filter  Esc back  ? help

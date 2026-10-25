@@ -1,0 +1,28 @@
+---
+source: crates/mejl-ui/tests/keys_editor.rs
+expression: hs.text()
+---
+ mejl   Key bindings                                 written to the config file 
+┌─ Keys ───────────────────────────────────────────────────────────────────────┐
+│ Preset: mine (based on fastmail)                                             │
+│ Macros  Mail  List only  1 of 13                                             │
+│                                                                              │
+│  Move                                                                        │
+│▸   Open                  o  Enter                                            │
+│    Page down             Space  PgDn                                         │
+│    Page up               PgUp                                                │
+│    Half page down        ^d                                                  │
+│    Half page up          ^u                                                  │
+│  Select                                                                      │
+│    Select                x                                                   │
+│    Select range          X                                                   │
+│    All                   * a                                                 │
+│    None                  * n                                                 │
+│  Triage                                                                      │
+│    Archive               y                                                   │
+│    Archive, previous     [                                                   │
+│ Open: Open the conversation or mailbox under the cursor                      │
+│ A change here applies to the list and the reader.                            │
+└──────────────────────────────────────────────────────────────────────────────┘
+ ✓ synced via JMAP push                                                         
+ j/k move  Enter replace  a add  x remove  Tab section  Esc back  ? help

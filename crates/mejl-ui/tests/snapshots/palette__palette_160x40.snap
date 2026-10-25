@@ -40,5 +40,5 @@ expression: hs.text()
 │                      │     Hugo Bran│ Also searches: mailboxes, saved searches, contacts, rules, masked addresses.     │                                     │
 │                      │     Grace Lin└──────────────────────────────────────────────────────────────────────────────────┘                                     │
 └──────────────────────┴─────────────────────────────────────────────────────────────────────────┴─────────────────────────────────────────────────────────────┘
- 26 of 119 commands match "go"                                                                                                           ✓ synced via JMAP push 
+ 26 of 120 commands match "go"                                                                                                           ✓ synced via JMAP push 
  Up/Down move  Enter run  Tab complete  ^n/^p next/prev  Esc close

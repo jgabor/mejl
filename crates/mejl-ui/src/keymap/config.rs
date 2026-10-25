@@ -15,7 +15,7 @@
 
 use thiserror::Error;
 
-use super::{Conflict, Context, KeySeq};
+use super::{Conflict, Context, KeySeq, Preset};
 use crate::action::Action;
 
 /// A problem in the `[keys]` table.
@@ -90,6 +90,18 @@ pub struct Override {
     pub action: Option<Action>,
 }
 
+/// A custom preset: a built-in base and the changes made to it. Kept as a
+/// diff, so actions added to mejl later get their default keys.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CustomPreset {
+    /// The name, as in `[presets.<name>]`.
+    pub name: String,
+    /// The built-in preset it changes.
+    pub base: Preset,
+    /// Its changes, as in `[presets.<name>.keys.<context>]`.
+    pub overrides: KeyOverrides,
+}
+
 /// Parsed `[keys]` overrides, applied with
 /// [`Keymap::with_overrides`](super::Keymap::with_overrides).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -98,9 +110,44 @@ pub struct KeyOverrides {
 }
 
 impl KeyOverrides {
-    /// The overrides in file order.
+    /// Overrides from parsed entries, applied in this order.
+    pub fn from_entries(entries: Vec<Override>) -> KeyOverrides {
+        KeyOverrides { entries }
+    }
+
+    /// The overrides in the order they apply: by context, then by key text,
+    /// as the config table sorts them.
     pub fn entries(&self) -> &[Override] {
         &self.entries
+    }
+
+    /// The overrides without any for these keys, for when the key editor
+    /// takes a key over from the `[keys]` table.
+    pub fn without(&self, keys: &[(Context, KeySeq)]) -> KeyOverrides {
+        KeyOverrides {
+            entries: self
+                .entries
+                .iter()
+                .filter(|o| !keys.iter().any(|(c, k)| *c == o.context && *k == o.keys))
+                .cloned()
+                .collect(),
+        }
+    }
+
+    /// The `keys` table for these overrides, one sub-table per context, as
+    /// [`KeyOverrides::from_table`] reads it. Unbinds are written `"none"`.
+    pub fn to_table(&self) -> toml::Table {
+        let mut out = toml::Table::new();
+        for o in &self.entries {
+            let table = out
+                .entry(o.context.name())
+                .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+            if let toml::Value::Table(t) = table {
+                let action = o.action.map_or("none", |a| a.name());
+                t.insert(o.keys.to_config(), action.into());
+            }
+        }
+        out
     }
 
     /// Parses a whole config document and reads its `[keys]` table. A

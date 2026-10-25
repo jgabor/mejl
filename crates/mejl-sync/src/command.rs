@@ -203,6 +203,53 @@ pub enum BulkAction {
     SetSeen(bool),
     /// Pin or unpin.
     SetFlagged(bool),
+    /// Several changes at once, as a macro makes them.
+    Patch(MacroPatch),
+}
+
+/// Several changes to one email, as one patch: keywords, at most one move
+/// and labels. Every mailbox is an id; roles are resolved by the caller.
+///
+/// [`BulkAction::patch`] applies the move first, then the labels, then
+/// the keywords. A caller that turns ordered steps into this keeps only
+/// the labels that come after the move or name neither mailbox of it, and
+/// one value per keyword and label, the last one, so the result is the
+/// same as applying the steps one by one.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MacroPatch {
+    /// Keywords to set (`true`) or clear.
+    pub keywords: Vec<(String, bool)>,
+    /// Move out of the source mailbox and into this one.
+    pub move_to: Option<Id>,
+    /// Mailboxes to add (`true`) or remove as labels.
+    pub labels: Vec<(Id, bool)>,
+}
+
+impl MacroPatch {
+    /// Sets or clears a keyword; a later value replaces an earlier one.
+    pub fn keyword(&mut self, keyword: &str, value: bool) {
+        let keyword = keyword.to_lowercase();
+        self.keywords.retain(|(k, _)| *k != keyword);
+        self.keywords.push((keyword, value));
+    }
+
+    /// Adds or removes a label; a later value replaces an earlier one.
+    pub fn label(&mut self, mailbox: Id, member: bool) {
+        self.labels.retain(|(m, _)| *m != mailbox);
+        self.labels.push((mailbox, member));
+    }
+
+    /// Moves out of `source` into `target`. Earlier labels that name
+    /// either mailbox are dropped, as the move decides them.
+    pub fn move_from(&mut self, source: &Id, target: Id) {
+        self.labels.retain(|(m, _)| m != source && *m != target);
+        self.move_to = Some(target);
+    }
+
+    /// Whether this changes no keyword, no label and moves nowhere.
+    pub fn is_empty(&self) -> bool {
+        self.keywords.is_empty() && self.move_to.is_none() && self.labels.is_empty()
+    }
 }
 
 /// The ids of the mailboxes with a role, for building action patches.
@@ -247,7 +294,8 @@ impl BulkAction {
     /// `source`. Moves remove the email from `source` and add the target;
     /// other mailboxes it is in are kept. `None` when the target mailbox
     /// does not exist, or when the action would move mail into the mailbox
-    /// it is already in.
+    /// it is already in. A [`BulkAction::Patch`] leaves such a move out and
+    /// is `None` only when nothing else is left.
     ///
     /// The binary can use this for single-conversation actions too, so
     /// both paths mean the same thing.
@@ -276,6 +324,23 @@ impl BulkAction {
             BulkAction::MoveTo(target) => move_to(&Some(target.clone())),
             BulkAction::SetSeen(value) => Some(Patch::new().keyword(keyword::SEEN, *value)),
             BulkAction::SetFlagged(value) => Some(Patch::new().keyword(keyword::FLAGGED, *value)),
+            BulkAction::Patch(m) => {
+                let mut p = Patch::new();
+                // A move into the mailbox the mail is in is left out; the
+                // rest still applies.
+                if let Some(target) = m.move_to.as_ref().filter(|t| *t != source) {
+                    p = p
+                        .mailbox(source.as_str(), false)
+                        .mailbox(target.as_str(), true);
+                }
+                for (mailbox, member) in &m.labels {
+                    p = p.mailbox(mailbox.as_str(), *member);
+                }
+                for (k, value) in &m.keywords {
+                    p = p.keyword(k, *value);
+                }
+                (!p.is_empty()).then_some(p)
+            }
         }
     }
 
@@ -290,6 +355,7 @@ impl BulkAction {
             BulkAction::SetSeen(false) => "Mark unread",
             BulkAction::SetFlagged(true) => "Pin",
             BulkAction::SetFlagged(false) => "Unpin",
+            BulkAction::Patch(_) => "Change",
         };
         format!("{verb} {count}")
     }
@@ -489,6 +555,51 @@ mod tests {
         assert_eq!(BulkAction::Archive.label(3), "Archive 3");
         assert_eq!(BulkAction::SetSeen(false).label(1), "Mark unread 1");
         assert_eq!(MaskedState::Disabled.as_str(), "disabled");
+    }
+
+    #[test]
+    fn a_macro_patch_moves_labels_and_sets_keywords_in_one_patch() {
+        let inbox = Id::from("in");
+        let mut m = MacroPatch::default();
+        m.keyword("$seen", true);
+        m.keyword("$flagged", true);
+        // An earlier label on the move's target is decided by the move.
+        m.label("rc".into(), false);
+        m.label("tax".into(), true);
+        m.move_from(&inbox, "rc".into());
+        m.keyword("$Flagged", false);
+        let action = BulkAction::Patch(m.clone());
+        assert_eq!(
+            json(action.patch(&inbox, &roles())),
+            serde_json::json!({
+                "mailboxIds/in": null, "mailboxIds/rc": true, "mailboxIds/tax": true,
+                "keywords/$seen": true, "keywords/$flagged": null
+            })
+        );
+        // The same patch built once serves every email of the mailbox.
+        assert_eq!(action.clone(), BulkAction::Patch(m.clone()));
+        // Run from the target itself, the move is left out and the rest stays.
+        assert_eq!(
+            json(action.patch(&Id::from("rc"), &roles())),
+            serde_json::json!({
+                "mailboxIds/tax": true, "keywords/$seen": true, "keywords/$flagged": null
+            })
+        );
+        assert!(
+            BulkAction::Patch(MacroPatch::default())
+                .patch(&inbox, &roles())
+                .is_none()
+        );
+        let only_move = MacroPatch {
+            move_to: Some(inbox.clone()),
+            ..MacroPatch::default()
+        };
+        assert!(
+            BulkAction::Patch(only_move)
+                .patch(&inbox, &roles())
+                .is_none()
+        );
+        assert_eq!(action.label(4), "Change 4");
     }
 
     #[test]

@@ -1,6 +1,6 @@
 //! Fuzzy pickers: the command palette, the move and label pickers, the
-//! From picker in compose, the links overlay and the copy, actions and
-//! Masked Email menus.
+//! From picker in compose, the links overlay, the copy, actions and
+//! Masked Email menus, and the key editor's questions.
 //!
 //! A [`Picker`] is a filter line over a list of [`PickItem`]s. Typing
 //! narrows the list with [`fuzzy::score`]; with an
@@ -35,6 +35,8 @@ pub enum PickerKind {
     Actions,
     /// Masked Email actions for the focused message.
     Mask,
+    /// A folder for a macro step. It changes no mail.
+    MacroFolder,
 }
 
 /// What choosing an item does.
@@ -42,6 +44,8 @@ pub enum PickerKind {
 pub enum PickValue {
     /// Run an action.
     Action(Action),
+    /// Run a macro.
+    Macro(crate::macros::MacroId),
     /// Go to a mailbox, move to it, or toggle it as a label.
     Mailbox(MailboxId),
     /// Create a mailbox named by the filter text.
@@ -79,6 +83,8 @@ pub enum PickValue {
     /// An answer to the question asked when quitting while a sent message
     /// is still in its undo send window.
     Quit(QuitChoice),
+    /// A choice in the key editor.
+    Keys(crate::keys_screen::KeysPick),
     /// A line of text that cannot be chosen.
     Info,
 }

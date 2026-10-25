@@ -14,19 +14,45 @@
 //! The engine is plain data: [`Keymap::feed`] takes the pending state and a
 //! key and returns a [`Resolution`]. The same tables drive the hint bar,
 //! help, which-key and the conflict checker behind `mejl keys --check`.
+//!
+//! A key runs a [`Binding`]: an [`Action`] or a user macro. A keymap is
+//! built in layers by [`Keymap::build`]: a built-in preset, the overrides
+//! of a custom preset, the top-level `[keys]` overrides, then the keys of
+//! macros.
 
 mod config;
+mod edit;
 mod key;
 mod preset;
 
 use std::collections::BTreeMap;
 use std::fmt;
 
-pub use config::{KeyOverrides, KeymapError, Override};
+pub use config::{CustomPreset, KeyOverrides, KeymapError, Override};
+pub use edit::Lookup;
 pub use key::{Key, KeyName, KeyParseError, KeySeq};
 pub use preset::Preset;
 
-use crate::action::Action;
+use crate::action::{Action, Category};
+use crate::macros::{Macro, MacroId};
+
+/// What a key sequence runs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum Binding {
+    /// A built-in command.
+    Action(Action),
+    /// A user macro.
+    Macro(MacroId),
+}
+
+impl From<Action> for Binding {
+    fn from(a: Action) -> Self {
+        Binding::Action(a)
+    }
+}
+
+/// Contexts a macro's keys bind in: where conversations are.
+pub const MACRO_CONTEXTS: [Context; 2] = [Context::List, Context::Reader];
 
 /// Where a binding applies.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -54,11 +80,13 @@ pub enum Context {
     Rules,
     /// The settings screen, before the global table.
     Settings,
+    /// The key binding editor, before the global table.
+    Keys,
 }
 
 impl Context {
     /// Every context.
-    pub const ALL: [Context; 10] = [
+    pub const ALL: [Context; 11] = [
         Context::Global,
         Context::List,
         Context::Reader,
@@ -69,6 +97,7 @@ impl Context {
         Context::Masked,
         Context::Rules,
         Context::Settings,
+        Context::Keys,
     ];
 
     /// True for contexts of a whole screen or modal layer. Their bindings
@@ -91,6 +120,7 @@ impl Context {
             Context::Masked => "masked",
             Context::Rules => "rules",
             Context::Settings => "settings",
+            Context::Keys => "keys",
         }
     }
 
@@ -132,6 +162,11 @@ pub enum Resolution {
         /// Repeat count, if one was typed.
         count: Option<u32>,
     },
+    /// Run a macro.
+    Macro {
+        /// The macro.
+        id: MacroId,
+    },
     /// The keys so far are a prefix (or a count). Wait for the next key.
     Pending,
     /// A pending prefix was cancelled by Esc or by a key that does not
@@ -155,14 +190,19 @@ pub struct Continuation {
 pub enum ContinuationTarget {
     /// Runs this action.
     Action(Action),
+    /// Runs this macro.
+    Macro(MacroId),
     /// Opens a deeper prefix with this label.
     Prefix(String),
 }
 
+/// A binding and where it sorts: `rank` groups the keys of one binding
+/// (the first key bound decides), `seq` keeps them in the order they were
+/// bound, so the first key stays the one hints show.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Entry {
-    action: Action,
-    order: u32,
+    binding: Binding,
+    order: (u32, u32),
 }
 
 /// Severity of a [`Conflict`].
@@ -207,10 +247,34 @@ impl fmt::Display for Conflict {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Keymap {
     preset: Preset,
+    name: String,
     tables: BTreeMap<Context, BTreeMap<KeySeq, Entry>>,
     prefix_labels: BTreeMap<KeySeq, String>,
+    macros: Vec<MacroInfo>,
     next_order: u32,
     warnings: Vec<Conflict>,
+}
+
+/// What help and which-key show for a macro.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct MacroInfo {
+    label: String,
+    summary: String,
+}
+
+/// The layers of a keymap, for [`Keymap::build`].
+#[derive(Clone, Copy, Debug)]
+pub struct KeymapSpec<'a> {
+    /// The built-in preset everything starts from.
+    pub base: Preset,
+    /// The preset's name: the built-in name, or a custom preset's.
+    pub name: &'a str,
+    /// A custom preset's own overrides.
+    pub preset: &'a KeyOverrides,
+    /// The top-level `[keys]` overrides.
+    pub user: &'a KeyOverrides,
+    /// Macros, whose keys bind last.
+    pub macros: &'a [Macro],
 }
 
 impl Default for Keymap {
@@ -224,8 +288,10 @@ impl Keymap {
     pub fn preset(preset: Preset) -> Keymap {
         let mut map = Keymap {
             preset,
+            name: preset.name().to_owned(),
             tables: BTreeMap::new(),
             prefix_labels: BTreeMap::new(),
+            macros: Vec::new(),
             next_order: 0,
             warnings: Vec::new(),
         };
@@ -234,7 +300,16 @@ impl Keymap {
             // failure here is a programming error caught in CI; skipping
             // keeps release builds running regardless.
             if let Ok(seq) = keys.parse::<KeySeq>() {
-                map.bind(ctx, seq, action);
+                // Preset order is the order help and which-key show.
+                let n = map.next_order;
+                map.next_order += 1;
+                map.tables.entry(ctx).or_default().insert(
+                    seq,
+                    Entry {
+                        binding: Binding::Action(action),
+                        order: (n, n),
+                    },
+                );
             }
         }
         for (keys, label) in preset.prefix_labels() {
@@ -252,27 +327,153 @@ impl Keymap {
         preset: Preset,
         overrides: &KeyOverrides,
     ) -> Result<Keymap, Vec<KeymapError>> {
-        let mut map = Keymap::preset(preset);
-        for o in overrides.entries() {
-            match o.action {
-                Some(action) => map.bind(o.context, o.keys.clone(), action),
-                None => map.unbind(o.context, &o.keys),
-            }
-        }
-        let (errors, warnings): (Vec<Conflict>, Vec<Conflict>) = map
+        Keymap::build(KeymapSpec {
+            base: preset,
+            name: preset.name(),
+            preset: overrides,
+            user: &KeyOverrides::default(),
+            macros: &[],
+        })
+    }
+
+    /// A keymap from its layers. Fails when an override makes a binding
+    /// unreachable. A macro key never fails the build: one that would
+    /// break a prefix is skipped, one that takes a key from a command
+    /// wins, and both are kept in [`Keymap::warnings`].
+    pub fn build(spec: KeymapSpec<'_>) -> Result<Keymap, Vec<KeymapError>> {
+        let mut map = Keymap::preset(spec.base);
+        map.name = spec.name.to_owned();
+        map.apply(spec.preset);
+        map.apply(spec.user);
+        let (errors, mut warnings): (Vec<Conflict>, Vec<Conflict>) = map
             .check()
             .into_iter()
             .partition(|c| c.severity == Severity::Error);
         if !errors.is_empty() {
             return Err(errors.into_iter().map(KeymapError::Conflict).collect());
         }
+        map.macros = spec
+            .macros
+            .iter()
+            .map(|m| MacroInfo {
+                label: m.label.clone(),
+                summary: m
+                    .steps
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            })
+            .collect();
+        for (i, m) in spec.macros.iter().enumerate() {
+            let id = MacroId(u16::try_from(i).unwrap_or(u16::MAX));
+            for keys in &m.keys {
+                for ctx in MACRO_CONTEXTS {
+                    if let Some(w) = map.bind_macro(ctx, keys, id) {
+                        warnings.push(w);
+                    }
+                }
+            }
+        }
         map.warnings = warnings;
         Ok(map)
     }
 
-    /// The preset this keymap started from.
+    /// Applies overrides in order.
+    pub fn apply(&mut self, overrides: &KeyOverrides) {
+        for o in overrides.entries() {
+            match o.action {
+                Some(action) => self.bind(o.context, o.keys.clone(), action),
+                None => self.unbind(o.context, &o.keys),
+            }
+        }
+    }
+
+    /// Binds one macro key, unless it would cut a prefix in `ctx` or the
+    /// global table. Says what it skipped or took over.
+    fn bind_macro(&mut self, ctx: Context, keys: &KeySeq, id: MacroId) -> Option<Conflict> {
+        let label = self.binding_name(Binding::Macro(id));
+        let conflict = |message: String| Conflict {
+            severity: Severity::Warning,
+            context: ctx,
+            keys: keys.clone(),
+            message,
+        };
+        match self.lookup(&[ctx, Context::Global], keys) {
+            Lookup::Longer { example, .. } => Some(conflict(format!(
+                "macro {label} is not bound: {} starts {}",
+                keys.to_config(),
+                example.to_config()
+            ))),
+            Lookup::Shorter { keys: head, .. } => Some(conflict(format!(
+                "macro {label} is not bound: {} is already a key of its own",
+                head.to_config()
+            ))),
+            Lookup::Bound { binding, .. } => {
+                let other = self.binding_name(binding);
+                self.bind_to(ctx, keys.clone(), Binding::Macro(id));
+                (binding != Binding::Macro(id))
+                    .then(|| conflict(format!("macro {label} takes the key from {other}")))
+            }
+            Lookup::Free => {
+                self.bind_to(ctx, keys.clone(), Binding::Macro(id));
+                None
+            }
+        }
+    }
+
+    /// The built-in preset this keymap started from.
     pub fn preset_kind(&self) -> Preset {
         self.preset
+    }
+
+    /// The preset's name, built-in or custom.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// A short name for what a binding runs: the action's config name, or
+    /// the macro's label.
+    pub fn binding_name(&self, binding: Binding) -> String {
+        match binding {
+            Binding::Action(a) => a.name().to_owned(),
+            Binding::Macro(id) => self.macro_label(id).to_owned(),
+        }
+    }
+
+    /// The label of a macro, for which-key and help.
+    pub fn macro_label(&self, id: MacroId) -> &str {
+        self.macros
+            .get(usize::from(id.0))
+            .map_or("macro", |m| m.label.as_str())
+    }
+
+    /// The short label of a binding, for which-key and hints.
+    pub fn binding_label(&self, binding: Binding) -> &str {
+        match binding {
+            Binding::Action(a) => a.label(),
+            Binding::Macro(id) => self.macro_label(id),
+        }
+    }
+
+    /// The one-line description of a binding, for help. A macro's is its
+    /// steps.
+    pub fn binding_description(&self, binding: Binding) -> &str {
+        match binding {
+            Binding::Action(a) => a.description(),
+            Binding::Macro(id) => self
+                .macros
+                .get(usize::from(id.0))
+                .map_or("", |m| m.summary.as_str()),
+        }
+    }
+
+    /// The help and which-key group of a binding.
+    pub fn binding_category(&self, binding: Binding) -> Category {
+        match binding {
+            Binding::Action(a) => a.category(),
+            Binding::Macro(_) => Category::Macros,
+        }
     }
 
     /// Warnings found when overrides were applied.
@@ -282,12 +483,28 @@ impl Keymap {
 
     /// Adds or replaces a binding.
     pub fn bind(&mut self, context: Context, keys: KeySeq, action: Action) {
-        let order = self.next_order;
+        self.bind_to(context, keys, Binding::Action(action));
+    }
+
+    /// Adds or replaces a binding to an action or a macro. A second key of
+    /// a binding sorts next to its first, after it.
+    pub fn bind_to(&mut self, context: Context, keys: KeySeq, binding: Binding) {
+        let seq = self.next_order;
         self.next_order += 1;
-        self.tables
-            .entry(context)
-            .or_default()
-            .insert(keys, Entry { action, order });
+        let table = self.tables.entry(context).or_default();
+        let rank = table
+            .iter()
+            .filter(|(k, e)| e.binding == binding && **k != keys)
+            .map(|(_, e)| e.order.0)
+            .min()
+            .unwrap_or(seq);
+        table.insert(
+            keys,
+            Entry {
+                binding,
+                order: (rank, seq),
+            },
+        );
     }
 
     /// Removes a binding, and every longer binding it is a prefix of, so a
@@ -331,9 +548,9 @@ impl Keymap {
             if let Some(entry) = table.get(&seq) {
                 let count = pending.count;
                 pending.clear();
-                return Resolution::Action {
-                    action: entry.action,
-                    count,
+                return match entry.binding {
+                    Binding::Action(action) => Resolution::Action { action, count },
+                    Binding::Macro(id) => Resolution::Macro { id },
                 };
             }
             if Self::has_prefix(table, &seq) {
@@ -372,14 +589,14 @@ impl Keymap {
     /// preset order. For each next key the first context that knows the
     /// longer sequence decides, exactly as [`Keymap::feed`] does.
     pub fn continuations(&self, prefix: &[Key], contexts: &[Context]) -> Vec<Continuation> {
-        let mut out: Vec<(u32, Continuation)> = Vec::new();
+        let mut out: Vec<((u32, u32), Continuation)> = Vec::new();
         let mut decided: Vec<Key> = Vec::new();
         let prefix_seq = KeySeq(prefix.to_vec());
         for ctx in contexts {
             let Some(table) = self.tables.get(ctx) else {
                 continue;
             };
-            let mut found: Vec<(Key, u32, ContinuationTarget)> = Vec::new();
+            let mut found: Vec<(Key, (u32, u32), ContinuationTarget)> = Vec::new();
             for (seq, entry) in table.range(prefix_seq.clone()..) {
                 if *seq == prefix_seq {
                     continue;
@@ -396,12 +613,12 @@ impl Keymap {
                     Some(slot) => {
                         slot.1 = slot.1.min(entry.order);
                         if exact {
-                            slot.2 = ContinuationTarget::Action(entry.action);
+                            slot.2 = target_of(entry.binding);
                         }
                     }
                     None => {
                         let target = if exact {
-                            ContinuationTarget::Action(entry.action)
+                            target_of(entry.binding)
                         } else {
                             let mut deeper = prefix.to_vec();
                             deeper.push(next);
@@ -433,13 +650,24 @@ impl Keymap {
     /// The first binding of `action` in the active contexts, by preset
     /// order: the key shown in hints. Shadowed bindings are skipped.
     pub fn keys_for(&self, action: Action, contexts: &[Context]) -> Option<KeySeq> {
+        self.keys_for_binding(Binding::Action(action), contexts)
+    }
+
+    /// The key hints show for a macro.
+    pub fn keys_for_macro(&self, id: MacroId, contexts: &[Context]) -> Option<KeySeq> {
+        self.keys_for_binding(Binding::Macro(id), contexts)
+    }
+
+    /// The first binding of `binding` in the active contexts, by preset
+    /// order. Shadowed bindings are skipped.
+    pub fn keys_for_binding(&self, binding: Binding, contexts: &[Context]) -> Option<KeySeq> {
         for (i, ctx) in contexts.iter().enumerate() {
             let Some(table) = self.tables.get(ctx) else {
                 continue;
             };
             let best = table
                 .iter()
-                .filter(|(_, e)| e.action == action)
+                .filter(|(_, e)| e.binding == binding)
                 .filter(|(seq, _)| !self.shadowed(seq, &contexts[..i]))
                 .min_by_key(|(_, e)| e.order);
             if let Some((seq, _)) = best {
@@ -459,13 +687,13 @@ impl Keymap {
     }
 
     /// Every binding of a context, in preset order.
-    pub fn bindings(&self, context: Context) -> Vec<(KeySeq, Action)> {
-        let mut v: Vec<(u32, KeySeq, Action)> = self
+    pub fn bindings(&self, context: Context) -> Vec<(KeySeq, Binding)> {
+        let mut v: Vec<((u32, u32), KeySeq, Binding)> = self
             .tables
             .get(&context)
             .map(|t| {
                 t.iter()
-                    .map(|(k, e)| (e.order, k.clone(), e.action))
+                    .map(|(k, e)| (e.order, k.clone(), e.binding))
                     .collect()
             })
             .unwrap_or_default();
@@ -493,7 +721,7 @@ impl Keymap {
                         message: format!(
                             "bound to {} but also starts {}; with no timeouts those can never \
                              run. Unbind one of them",
-                            entry.action.name(),
+                            self.binding_name(entry.binding),
                             longer.join(", ")
                         ),
                     });
@@ -507,7 +735,7 @@ impl Keymap {
                             message: format!(
                                 "{reason}; {} works only with the kitty keyboard protocol or \
                                  tmux extended keys",
-                                entry.action.name()
+                                self.binding_name(entry.binding)
                             ),
                         });
                         break;
@@ -519,15 +747,15 @@ impl Keymap {
                 let Some(global) = self.tables.get(&Context::Global) else {
                     continue;
                 };
-                if let Some(g) = global.get(seq).filter(|g| g.action != entry.action) {
+                if let Some(g) = global.get(seq).filter(|g| g.binding != entry.binding) {
                     out.push(Conflict {
                         severity: Severity::Warning,
                         context: ctx,
                         keys: seq.clone(),
                         message: format!(
                             "{} here hides the global {}",
-                            entry.action.name(),
-                            g.action.name()
+                            self.binding_name(entry.binding),
+                            self.binding_name(g.binding)
                         ),
                     });
                 }
@@ -538,7 +766,7 @@ impl Keymap {
                         keys: seq.clone(),
                         message: format!(
                             "{} here hides the global {} prefix",
-                            entry.action.name(),
+                            self.binding_name(entry.binding),
                             seq.to_config()
                         ),
                     });
@@ -553,7 +781,7 @@ impl Keymap {
                             message: format!(
                                 "the prefix {} here hides the global {}",
                                 head.to_config(),
-                                g.action.name()
+                                self.binding_name(g.binding)
                             ),
                         });
                     }
@@ -561,6 +789,13 @@ impl Keymap {
             }
         }
         out
+    }
+}
+
+fn target_of(binding: Binding) -> ContinuationTarget {
+    match binding {
+        Binding::Action(a) => ContinuationTarget::Action(a),
+        Binding::Macro(id) => ContinuationTarget::Macro(id),
     }
 }
 

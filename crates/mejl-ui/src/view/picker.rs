@@ -28,6 +28,7 @@ pub(super) fn hints(p: &Picker) -> Vec<Hint> {
                 PickerKind::From => "use",
                 PickerKind::Links => "open",
                 PickerKind::Copy => "copy",
+                PickerKind::MacroFolder => "pick",
             },
             HitTarget::Popup,
         ),
@@ -47,7 +48,7 @@ impl MailView<'_> {
     pub(super) fn picker_status(&self, p: &Picker) -> String {
         let what = match p.kind {
             PickerKind::Palette => "commands",
-            PickerKind::MoveTo | PickerKind::Label => "mailboxes",
+            PickerKind::MoveTo | PickerKind::Label | PickerKind::MacroFolder => "mailboxes",
             PickerKind::From => "addresses",
             PickerKind::Links => "links",
             PickerKind::Copy | PickerKind::Actions | PickerKind::Mask => "items",

@@ -1,0 +1,44 @@
+---
+source: crates/mejl-ui/tests/keys_editor.rs
+expression: hs.text()
+---
+ mejl   mira@example.org   Key bindings                                                                                              written to the config file 
+┌─ Keys ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ Preset: fastmail (built in)                                                                                                                                  │
+│ Mail  List only  Reader only  Global  Compose  Search  Sidebar  Masked  Rules  Settings  Help  Keys  Macros                                                  │
+│                                                                                                                                                              │
+│  Macro: File receipt   keys: none                                                                                                                            │
+│                                                                                                                                                              │
+│   1. Mark read                                                                                                                                               │
+│▸  2. Unpin                                                                                                                                                   │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│ Each change is saved at once. Every step acts on the same conversations.                                                                                     │
+│ At most 10 steps, and one of move, archive, trash or spam.                                                                                                   │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+ Added Unpin to File receipt                                                                                                             ✓ synced via JMAP push 
+ j/k move  a add step  x remove step  J/K reorder  r rename  b bind key  Esc back  ? help

@@ -28,6 +28,9 @@ pub enum Preset {
 }
 
 impl Preset {
+    /// Every built-in preset.
+    pub const ALL: [Preset; 2] = [Preset::Fastmail, Preset::Vim];
+
     /// Config name.
     pub fn name(self) -> &'static str {
         match self {
@@ -72,6 +75,7 @@ impl Preset {
         add(Context::Masked, MASKED);
         add(Context::Rules, RULES);
         add(Context::Settings, SETTINGS);
+        add(Context::Keys, KEYS);
         out
     }
 
@@ -444,11 +448,39 @@ const SETTINGS: &[(&str, A)] = &[
     ("down", A::Next),
     ("k", A::Prev),
     ("up", A::Prev),
-    ("enter", A::SettingChange),
+    ("enter", A::SettingOpen),
     ("space", A::SettingChange),
     ("right", A::SettingChange),
     ("l", A::SettingChange),
     ("left", A::SettingChangeBack),
     ("h", A::SettingChangeBack),
+    ("esc", A::Back),
+];
+
+/// The key editor. A few keys mean different things by where the cursor
+/// is: on a key row, on a macro, or in a macro's steps.
+const KEYS: &[(&str, A)] = &[
+    ("j", A::Next),
+    ("down", A::Next),
+    ("k", A::Prev),
+    ("up", A::Prev),
+    ("pgdn", A::PageDown),
+    ("pgup", A::PageUp),
+    ("tab", A::NextPane),
+    ("shift-tab", A::PrevPane),
+    ("enter", A::KeyReplace),
+    ("a", A::KeyAdd),
+    ("x", A::KeyRemove),
+    ("u", A::KeyReset),
+    ("d", A::PresetDuplicate),
+    ("R", A::PresetRename),
+    ("D", A::PresetDelete),
+    ("p", A::PresetSwitch),
+    ("/", A::Filter),
+    ("n", A::MacroNew),
+    ("r", A::MacroRename),
+    ("b", A::MacroBind),
+    ("K", A::MacroStepUp),
+    ("J", A::MacroStepDown),
     ("esc", A::Back),
 ];

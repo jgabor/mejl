@@ -7,6 +7,7 @@
 //! state's cache does not already hold it).
 
 mod compose;
+mod keys;
 mod overlays;
 mod panes;
 mod picker;
@@ -83,6 +84,7 @@ pub fn render(state: &AppState, data: &dyn MailData, frame: &mut Frame<'_>) -> R
         Screen::Masked => mail.masked(&mut p),
         Screen::Rules => mail.rules(&mut p),
         Screen::Settings => mail.settings(&mut p),
+        Screen::Keys => mail.keys_screen(&mut p),
     }
     mail.overlays(&mut p);
     if state.announce && state.toast().is_some() {
@@ -331,7 +333,7 @@ impl MailView<'_> {
             Some(Overlay::Help(h)) => self.help(p, h),
             Some(Overlay::Perf) => self.perf(p),
             Some(Overlay::Picker(pk)) => self.picker(p, pk),
-            Some(Overlay::Confirm(_) | Overlay::Prompt(_)) | None => {}
+            Some(Overlay::Confirm(_) | Overlay::Prompt(_) | Overlay::CaptureKey(_)) | None => {}
         }
     }
 
@@ -428,7 +430,7 @@ impl MailView<'_> {
             let mut v = Vec::new();
             if wide {
                 v.push((
-                    format!("{} preset", s.config.keymap.preset_kind().name()),
+                    format!("{} preset", s.config.keymap.name()),
                     StyleName::TopInfo,
                 ));
                 v.push(("   ".to_owned(), StyleName::TopInfo));
@@ -563,9 +565,14 @@ impl MailView<'_> {
             Some(Overlay::Prompt(pr)) => Some(pr),
             _ => None,
         };
+        let capture = match s.overlays.last() {
+            Some(Overlay::CaptureKey(c)) => Some(c),
+            _ => None,
+        };
         let countdown = if toast.is_none() { s.countdown() } else { None };
         let left_busy = confirm.is_some()
             || prompt.is_some()
+            || capture.is_some()
             || toast.is_some()
             || countdown.is_some()
             || selection > 0
@@ -623,6 +630,25 @@ impl MailView<'_> {
                     .add_modifier(ratatui::style::Modifier::REVERSED),
             );
             p.cursor = Some(Position::new(cur, y));
+        } else if let Some(c) = capture {
+            x = p.put(
+                x,
+                y,
+                &c.prompt,
+                p.style(StyleName::StatusWarning)
+                    .add_modifier(ratatui::style::Modifier::BOLD),
+                left_max,
+            );
+            if !c.keys.is_empty() {
+                x = p.put(x, y, "  ", Style::new(), left_max);
+                let typed = format!(
+                    "{} {}",
+                    KeySeq(c.keys.clone()),
+                    s.config.theme.glyphs.ellipsis
+                );
+                x = p.put(x, y, &typed, p.style(StyleName::HintKey), left_max);
+            }
+            p.cursor = Some(Position::new(x.min(left_max), y));
         } else if let Some(c) = confirm {
             x = p.put(
                 x,
@@ -866,6 +892,12 @@ impl MailView<'_> {
                     Hint::fixed("Esc", "cancel", HitTarget::Backdrop),
                 ];
             }
+            Some(Overlay::CaptureKey(_)) => {
+                return vec![
+                    Hint::fixed("any key", "binds it", HitTarget::Popup),
+                    Hint::fixed("Esc", "cancel", HitTarget::Backdrop),
+                ];
+            }
             None => {}
         }
         match s.screen {
@@ -873,6 +905,7 @@ impl MailView<'_> {
             Screen::Compose => return self.compose_hints(),
             Screen::Search => return self.search_hints(),
             Screen::Masked | Screen::Rules | Screen::Settings => return self.screen_hints(),
+            Screen::Keys => return self.keys_hints(),
         }
         let v: Vec<Option<Hint>> = match s.focus {
             Focus::List => vec![

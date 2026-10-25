@@ -6,7 +6,7 @@ expression: hs.text()
 ┌─ Settings ───────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                                                      │
 │▸ Theme           terminal            terminal uses your terminal's colours; mono and high-contrast use none          │
-│  Keys            fastmail            fastmail follows Fastmail's web shortcuts; vim follows aerc and vim             │
+│  Keys            fastmail            fastmail follows Fastmail's web shortcuts, vim follows aerc; Enter edits keys   │
 │  List density    comfortable         compact drops date headings; relaxed shows a preview line                       │
 │  Prefer HTML     off                 show the HTML part when a message has both; V switches per message              │
 │  Undo send       10 s                how long a sent message waits so z can cancel it                                │

@@ -668,7 +668,8 @@ fn settings_change_and_apply() {
     let cmds = hs.click(x, y);
     assert!(cmds.contains(&Cmd::SaveSetting(Setting::PreferHtml(true))));
     for (k, a) in [
-        ("enter", Action::SettingChange),
+        ("enter", Action::SettingOpen),
+        ("space", Action::SettingChange),
         ("l", Action::SettingChange),
         ("h", Action::SettingChangeBack),
         ("j", Action::Next),

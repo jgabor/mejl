@@ -132,6 +132,11 @@ impl ThreadSnapshot {
 }
 
 /// An action on every conversation of a mailbox, from `* a`.
+///
+/// A macro can set the move, read state and pin at once, and all three
+/// show in the frame of the key. Mute and labels have no field here: they
+/// show once the store has the change, one round trip through the store
+/// thread later.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BulkOverlay {
     /// The mailbox.

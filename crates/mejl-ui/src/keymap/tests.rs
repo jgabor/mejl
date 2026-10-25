@@ -304,3 +304,115 @@ fn help_context_is_modal() {
     assert_eq!(run(&map, help, "esc"), [act(Action::Back)]);
     assert_eq!(run(&map, help, "j"), [Resolution::Unbound]);
 }
+
+fn a_macro(label: &str, keys: &[&str]) -> Macro {
+    Macro {
+        id: crate::macros::id_for(label, &[]),
+        label: label.into(),
+        keys: keys.iter().map(|k| k.parse().unwrap()).collect(),
+        steps: vec![crate::macros::Step::MarkRead, crate::macros::Step::Unpin],
+    }
+}
+
+fn layered(base: Preset, preset: &str, user: &str, macros: &[Macro]) -> Keymap {
+    let preset = KeyOverrides::from_toml(preset).unwrap();
+    let user = KeyOverrides::from_toml(user).unwrap();
+    Keymap::build(KeymapSpec {
+        base,
+        name: "mine",
+        preset: &preset,
+        user: &user,
+        macros,
+    })
+    .unwrap()
+}
+
+#[test]
+fn macro_keys_run_macros_in_the_list_and_the_reader() {
+    let map = layered(Preset::Fastmail, "", "", &[a_macro("Tidy", &["F2", "g x"])]);
+    let tidy = Resolution::Macro { id: MacroId(0) };
+    assert_eq!(run(&map, LIST, "F2"), [tidy]);
+    assert_eq!(run(&map, READER, "g x"), [Resolution::Pending, tidy]);
+    assert_eq!(
+        run(&map, &[Context::Settings, Context::Global], "F2"),
+        [Resolution::Unbound],
+        "only where conversations are"
+    );
+    assert!(map.warnings().is_empty(), "{:?}", map.warnings());
+    let g = map.continuations(&[k("g")], LIST);
+    assert!(
+        g.iter()
+            .any(|c| c.target == ContinuationTarget::Macro(MacroId(0)))
+    );
+    assert_eq!(
+        map.keys_for_macro(MacroId(0), LIST),
+        Some("F2".parse().unwrap())
+    );
+    assert_eq!(map.binding_label(Binding::Macro(MacroId(0))), "Tidy");
+    assert_eq!(
+        map.binding_description(Binding::Macro(MacroId(0))),
+        "Mark read, Unpin"
+    );
+    assert_eq!(map.name(), "mine");
+}
+
+#[test]
+fn a_macro_key_never_breaks_the_keymap() {
+    // `r` is a prefix in vim and `g` is the global go-to prefix: both are
+    // skipped with a warning. `T` (thread view) is taken over, with one.
+    let map = layered(Preset::Vim, "", "", &[a_macro("Tidy", &["r", "g", "T"])]);
+    assert_eq!(
+        run(&map, LIST, "r r"),
+        [Resolution::Pending, act(Action::ReplyAll)]
+    );
+    assert_eq!(
+        run(&map, LIST, "g i"),
+        [Resolution::Pending, act(Action::GoInbox)]
+    );
+    assert_eq!(run(&map, LIST, "T"), [Resolution::Macro { id: MacroId(0) }]);
+    let warnings: Vec<String> = map.warnings().iter().map(ToString::to_string).collect();
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.contains("\"r\"") && w.contains("not bound")),
+        "{warnings:?}"
+    );
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.contains("\"g\"") && w.contains("not bound")),
+        "{warnings:?}"
+    );
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.contains("takes the key from toggle-threads")),
+        "{warnings:?}"
+    );
+    assert!(map.check().iter().all(|c| c.severity == Severity::Warning));
+}
+
+#[test]
+fn layers_apply_in_order() {
+    let map = layered(
+        Preset::Fastmail,
+        "[keys.list]\ne = \"archive\"\ny = \"none\"\n",
+        "[keys.list]\ne = \"trash\"\n",
+        &[],
+    );
+    assert_eq!(run(&map, LIST, "e"), [act(Action::Trash)], "[keys] wins");
+    assert_eq!(run(&map, LIST, "y"), [Resolution::Unbound]);
+    assert_eq!(map.preset_kind(), Preset::Fastmail);
+    let bad = KeyOverrides::from_toml("[keys.list]\n\".\" = \"archive\"\n").unwrap();
+    assert!(
+        Keymap::build(KeymapSpec {
+            base: Preset::Fastmail,
+            name: "mine",
+            preset: &bad,
+            user: &KeyOverrides::default(),
+            macros: &[],
+        })
+        .is_err(),
+        "a preset key that also starts `. r` is still an error"
+    );
+}

@@ -1,0 +1,40 @@
+---
+source: crates/mejl-ui/tests/keys_editor.rs
+expression: hs.text()
+---
+ mejl   mira@example.org   Key bindings                                                      written to the config file 
+┌─ Keys ───────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ Preset: mine (based on fastmail)                                                                                     │
+│ Mail  List only  Reader only  Global  Compose  Search  Sidebar  Masked  Rules  Settings  Help  Keys  Macros          │
+│                                                                                                                      │
+│  Move                                                                                                                │
+│▸   Open                  o  Enter                  Open the conversation or mailbox under the cursor                 │
+│    Page down             Space  PgDn               Scroll one page down                                              │
+│    Page up               PgUp                      Scroll one page up                                                │
+│    Half page down        ^d                        Scroll half a page down                                           │
+│    Half page up          ^u                        Scroll half a page up                                             │
+│  Select                                                                                                              │
+│    Select                x                         Select or deselect the conversation                               │
+│    Select range          X                         Select from the last selected row to the cursor                   │
+│    All                   * a                       Select every conversation in the mailbox                          │
+│    None                  * n                       Clear the selection                                               │
+│  Triage                                                                                                              │
+│    Archive               y                         Archive                                                           │
+│    Archive, previous     [                         Archive, then go to the previous conversation                     │
+│    Archive, next         ]                         Archive, then go to the next conversation                         │
+│    Trash                 d                         Move to trash (undo with z)                                       │
+│    Delete permanently, ⋯ #                         Delete permanently, in Trash and Spam only                        │
+│    Spam                  !                         Report spam                                                       │
+│    Move to               m  v                      Move to a mailbox                                                 │
+│    Label                 l                         Add or remove labels                                              │
+│    Pin or unpin          s                         Pin or unpin                                                      │
+│    Read                  . r  I                    Mark as read                                                      │
+│    Unread                . u  U                    Mark as unread                                                    │
+│    Pin                   . p                       Pin                                                               │
+│    Unpin                 . n                       Unpin                                                             │
+│    Mute                  M                         Mute the conversation                                             │
+│ Open: Open the conversation or mailbox under the cursor                                                              │
+│ A change here applies to the list and the reader.                                                                    │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+                                                                                                 ✓ synced via JMAP push 
+ j/k move  Enter replace  a add  x remove  u reset  Tab section  / filter  p switch preset  Esc back  ? help

@@ -1,11 +1,11 @@
-//! Dispatch for the Masked Email, rules and settings screens, the settings
-//! screen itself, and mouse targets shared by screens.
+//! Dispatch for the Masked Email, rules, settings and key editor screens,
+//! the settings screen itself, and mouse targets shared by screens.
 
 use crate::action::Action;
 use crate::data::MailData;
 use crate::event::{Cmd, DataChange, ToastLevel};
 use crate::rules::{RulesPane, form_rows};
-use crate::settings::{ROWS, SettingsScreen};
+use crate::settings::{ROWS, Row, SettingsScreen};
 use crate::state::{AppState, Screen};
 
 impl AppState {
@@ -23,6 +23,7 @@ impl AppState {
             Screen::Masked => self.masked_action(data, action, cmds),
             Screen::Rules => self.rules_action(data, action, cmds),
             Screen::Settings => self.settings_action(action, cmds),
+            Screen::Keys => self.keys_action(data, action, cmds),
             Screen::Mail => self.mail_mask_action(data, action, cmds),
             Screen::Compose | Screen::Search => false,
         }
@@ -49,7 +50,13 @@ impl AppState {
             Action::Prev => s.cursor = s.cursor.saturating_sub(1),
             Action::GoTop => s.cursor = 0,
             Action::GoBottom => s.cursor = ROWS.len() - 1,
-            Action::SettingChange | Action::SettingChangeBack | Action::Open => {
+            Action::SettingOpen if ROWS[s.cursor.min(ROWS.len() - 1)] == Row::Preset => {
+                self.open_keys(cmds);
+            }
+            Action::SettingChange
+            | Action::SettingChangeBack
+            | Action::SettingOpen
+            | Action::Open => {
                 let row = ROWS[s.cursor.min(ROWS.len() - 1)];
                 let setting = row.step(&self.config, action != Action::SettingChangeBack);
                 s.saving = Some(row);
@@ -95,6 +102,10 @@ impl AppState {
                 }
                 true
             }
+            Screen::Keys => {
+                self.keys_wheel(down);
+                true
+            }
             Screen::Mail => false,
             Screen::Compose | Screen::Settings => true,
         }
@@ -113,7 +124,7 @@ impl AppState {
             Screen::Settings => {
                 if let Some(s) = self.settings.as_mut() {
                     if s.cursor == index {
-                        self.settings_action(Action::SettingChange, cmds);
+                        self.settings_action(Action::SettingOpen, cmds);
                     } else {
                         s.cursor = index.min(ROWS.len() - 1);
                     }
@@ -126,6 +137,7 @@ impl AppState {
                     s.form_cursor = index.min(rows.saturating_sub(1));
                 }
             }
+            Screen::Keys => self.keys_click_section(index),
             Screen::Mail | Screen::Search | Screen::Masked => {}
         }
     }
@@ -175,6 +187,7 @@ impl AppState {
                     };
                 }
             }
+            Screen::Keys => self.keys_click_row(data, index, cmds),
             Screen::Mail | Screen::Compose | Screen::Settings => {}
         }
     }

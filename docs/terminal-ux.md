@@ -180,6 +180,7 @@ Layers, from always-on to on-demand:
 
 - TOML file with `[keys.list]`, `[keys.reader]`, `[keys.compose]`, `[keys.global]` sections, each mapping a key string to a command name. Same command names as the palette, so users can discover a name in the palette and bind it (inferred).
 - Named presets (`preset = "fastmail" | "vim"`), with user overrides on top, like zellij's presets (verified that zellij ships presets).
+- As built: custom presets. A custom preset is a built-in base plus its own changes (`[presets.<name>]` with `base` and `keys`), so actions added to mejl later still get their default keys. The key editor (settings, Enter on Keys) works like the controls screen of a PC game: duplicate a preset, pick a command, press the new key. It checks every context active when the key fires, offers swap or replace on a clash, refuses keys that would break a prefix, never removes the last key of back, help, the palette, quit-now or settings, and refuses plain letters in compose, search and help, where they type. The top-level `[keys]` table still applies on top of any preset.
 - Key parsing: `crokey` (1.5.1) parses and formats key combos such as `ctrl-k` for crossterm events (verified: crates.io; API detail unverified). A small in-house parser is also realistic.
 - `mejl keys --check` reports conflicts and keys that legacy encoding cannot deliver (for example `ctrl-shift-x` or `ctrl-i` distinct from Tab) (inferred).
 
@@ -189,6 +190,7 @@ Layers, from always-on to on-demand:
 - Bulk work goes through selection, not counts or macros: `x` toggle, `X` range (verified: Fastmail), `*` `a` all in view, `*` `n` none, plus "select all matching search" which applies to the whole JMAP query result, not just loaded rows (inferred, JMAP `Email/query` gives ids for the full result).
 - `.` repeat-last-action is useful in vim muscle memory (aerc binds `.` to `:repeat`, verified) but collides with Fastmail's `.` prefix. In the vim preset `.` repeats; in the Fastmail preset `.` is the mark prefix.
 - Neomutt-style macros are mostly used to chain "mark, move, sync". mejl should cover those with first-class commands: "archive and next" (`[`/`]`, Fastmail), "move to X and next", "create rule from this message", "mask this sender" (inferred).
+- As built: mejl also has macros, but only for changes to mail. A macro (`[macros.<name>]`) is a list of steps (mark read or unread, pin or unpin, mute, add or remove a label, move to a folder, archive, trash, spam) with its own keys. All steps act on the same conversations (the selection, or the one under the cursor) and go to the server as one change, so one undo takes the whole macro back. A macro moves the mail at most once, and never sends, navigates or deletes for good. Its keys bind in the list and the reader on every preset; a key that would break the active preset's prefixes is skipped with a warning that `mejl keys --check` also shows.
 
 ### Recommended keymap philosophy
 

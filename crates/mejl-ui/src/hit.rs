@@ -45,6 +45,8 @@ pub enum HitTarget {
     },
     /// Runs an action: hint bar entries, which-key entries, panel hints.
     Action(Action),
+    /// Runs a macro: which-key entries.
+    Macro(crate::macros::MacroId),
     /// Starts a prefix, as if its keys were typed (hint bar `g go`).
     Prefix(crate::keymap::KeySeq),
     /// Opens a link.

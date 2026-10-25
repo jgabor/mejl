@@ -78,8 +78,8 @@ mod upload;
 
 pub use apply::mailbox_query_key;
 pub use command::{
-    BulkAction, Command, MaskedState, OutgoingAttachment, OutgoingMessage, RoleMailboxes,
-    SearchRequest,
+    BulkAction, Command, MacroPatch, MaskedState, OutgoingAttachment, OutgoingMessage,
+    RoleMailboxes, SearchRequest,
 };
 pub use config::{Clock, EngineConfig, SystemClock};
 pub use drafts::DRAFT_COPY_ERROR;

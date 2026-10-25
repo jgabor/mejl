@@ -149,6 +149,8 @@ Fixed, each with tests:
 - `$EDITOR` pause waits for crossterm's reader to let go. The probe drains late replies. `caps.toml` and a small quirks table exist. Pty tests cover `enter`, `restore` and `suspend_*`.
 - Reader side-panel rows, the search filter block, Masked Email silent and created-by filters (keys `5`, `6`) and the rules "where the block runs" section (at 160x40 only) follow the mock-ups.
 - New setting `ui.mark_read_on_archive` (off by default).
+- Custom key presets with an in-app key editor (settings, Enter on Keys): duplicate a built-in preset, rebind each command, swap or replace on a clash. A preset stores its base and its changes only (`[presets.<name>]`).
+- Macros (`[macros.<name>]`): several changes to mail on one key, sent as one change with one undo, built in the key editor's Macros section.
 
 Not done:
 

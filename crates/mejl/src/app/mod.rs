@@ -984,18 +984,28 @@ impl<B: Backend> App<B> {
             Cmd::ConfirmRulePaste { render_id } => {
                 self.rules_write(LocalWrite::ConfirmRulePaste { render_id });
             }
-            Cmd::SaveSetting(setting) => {
-                let (config, error) = self.settings.apply(&setting);
-                if let Some(c) = config {
+            Cmd::SaveSetting(setting) => match self.settings.apply(&setting) {
+                (Some(c), error) => {
                     self.queue.push_back(Event::Msg(Msg::Config(Box::new(c))));
+                    if let Some(e) = error {
+                        self.toast(
+                            format!("Not saved, applies until you quit: {e}"),
+                            ToastLevel::Warning,
+                        );
+                    }
                 }
-                if let Some(e) = error {
-                    self.toast(
-                        format!("Not saved, applies until you quit: {e}"),
-                        ToastLevel::Warning,
-                    );
+                (None, error) => {
+                    let error = error.unwrap_or_else(|| "the change was refused".into());
+                    self.queue
+                        .push_back(Event::Msg(Msg::SettingRefused { error }));
                 }
-            }
+            },
+            Cmd::EditKeys(edit) => match self.settings.edit_keys(&edit) {
+                Ok(c) => self.queue.push_back(Event::Msg(Msg::Config(Box::new(c)))),
+                Err(error) => self
+                    .queue
+                    .push_back(Event::Msg(Msg::SettingRefused { error })),
+            },
         }
     }
 
@@ -1326,18 +1336,21 @@ impl<B: Backend> App<B> {
                 mailbox,
                 except,
                 action,
+                label,
                 overlay,
             } => {
-                let label = action.label(0).trim_end_matches(" 0").to_owned();
+                let shown = label
+                    .clone()
+                    .unwrap_or_else(|| action.label(0).trim_end_matches(" 0").to_owned());
                 self.journal.record(token, String::new(), Vec::new());
                 self.data.pending_mut().add_bulk(token, overlay);
-                self.tokens.insert(token, Waiting::Mutate { label });
+                self.tokens.insert(token, Waiting::Mutate { label: shown });
                 if self.send(Command::Bulk {
                     token,
                     mailbox,
                     except_threads: except,
                     action,
-                    label: None,
+                    label,
                 }) {
                     self.changed(DataChange {
                         mailboxes: true,
