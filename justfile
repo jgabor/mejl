@@ -46,6 +46,10 @@ check:
 keys:
     cargo run -- keys --check
 
+# Package every crate and build mejl as crates.io would, with publishing.
+publish:
+    cargo publish --workspace
+
 # Package every crate and build mejl as crates.io would, without publishing.
 publish-check:
     cargo publish --workspace --dry-run
