@@ -2,17 +2,21 @@
 
 mejl is a fast, keyboard-first email client for Fastmail that runs in your terminal. It talks to Fastmail over JMAP, keeps a local cache so it opens on your mail at once, applies every action straight away and syncs in the background. It knows Fastmail's own features: Masked Email, push, and rules you can build and test before you paste them into Fastmail.
 
-## Install from source
+## Install
 
 You need Rust 1.88 or newer.
+
+```sh
+cargo install --locked mejl
+```
+
+`--locked` builds with the exact dependency versions mejl was tested with. This puts a `mejl` binary in `~/.cargo/bin`. To build the latest code from source instead:
 
 ```sh
 git clone https://github.com/jgabor/mejl
 cd mejl
 cargo install --path crates/mejl
 ```
-
-This puts a `mejl` binary in `~/.cargo/bin`.
 
 ## Try it without an account
 

@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "JMAP for mejl: wire types, typed methods, request builder, HTTP transport and EventSource push parser"
 
 [dependencies]
 serde.workspace = true

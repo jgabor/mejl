@@ -46,6 +46,10 @@ check:
 keys:
     cargo run -- keys --check
 
+# Package every crate and build mejl as crates.io would, without publishing.
+publish-check:
+    cargo publish --workspace --dry-run
+
 # Tag a release and push the tag, which starts the release workflow. The
 # version must match Cargo.toml, as in `just release 0.1.0`.
 release version: check

@@ -11,14 +11,15 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/jgabor/mejl"
 
 [workspace.dependencies]
-# Internal
-mejl-jmap = { path = "crates/mejl-jmap" }
-mejl-fake = { path = "crates/mejl-fake" }
-mejl-store = { path = "crates/mejl-store" }
-mejl-sync = { path = "crates/mejl-sync" }
-mejl-sieve = { path = "crates/mejl-sieve" }
-mejl-render = { path = "crates/mejl-render" }
-mejl-ui = { path = "crates/mejl-ui" }
+# Internal. crates.io needs a version on each one. Keep it equal to
+# workspace.package.version when you bump it.
+mejl-jmap = { path = "crates/mejl-jmap", version = "0.2.0" }
+mejl-fake = { path = "crates/mejl-fake", version = "0.2.0" }
+mejl-store = { path = "crates/mejl-store", version = "0.2.0" }
+mejl-sync = { path = "crates/mejl-sync", version = "0.2.0" }
+mejl-sieve = { path = "crates/mejl-sieve", version = "0.2.0" }
+mejl-render = { path = "crates/mejl-render", version = "0.2.0" }
+mejl-ui = { path = "crates/mejl-ui", version = "0.2.0" }
 
 # TUI
 ratatui = "0.30.2"

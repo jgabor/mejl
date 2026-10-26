@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "mejl's rule model: Sieve rendering, validation and a local dry-run matcher"
 
 [dependencies]
 serde.workspace = true

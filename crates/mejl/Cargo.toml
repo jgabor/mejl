@@ -6,6 +6,9 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Fast, keyboard-first terminal email client for Fastmail"
+readme = "../../README.md"
+keywords = ["email", "fastmail", "jmap", "tui", "terminal"]
+categories = ["command-line-utilities", "email"]
 
 [lib]
 name = "mejl"

@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Fake JMAP server for mejl with fictional demo data, in process or over loopback HTTP"
 
 [dependencies]
 mejl-jmap.workspace = true
