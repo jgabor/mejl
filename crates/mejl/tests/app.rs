@@ -1232,6 +1232,54 @@ fn scrolling_past_the_cached_window_loads_more() {
 }
 
 #[test]
+fn opening_a_folder_fetches_its_first_window() {
+    // The first sync only fetches role mailboxes. Mail filed straight into
+    // a folder before then is not in the cache until the folder is opened.
+    let server = FakeServer::demo(Timestamp::now());
+    let from = Address::new("Ferry office", "ferry@example.net");
+    let day = jiff::SignedDuration::from_hours(24);
+    for i in 1..=30 {
+        let at = Timestamp::now() - day * (i + 1);
+        server
+            .deliver_incoming(
+                IncomingMessage::new(from.clone(), format!("Ferry timetable {i}"))
+                    .mailbox("Travel")
+                    .received_at(at),
+            )
+            .unwrap();
+    }
+    let on_server = server
+        .call(
+            "Email/query",
+            json!({"filter": {"inMailbox": server.mailbox_id("Travel").unwrap()},
+                   "collapseThreads": true, "calculateTotal": true}),
+        )
+        .unwrap()["total"]
+        .as_u64()
+        .unwrap();
+    let mut hs = Harness::synced_with(
+        Setup {
+            server,
+            ..Setup::demo()
+        },
+        160,
+        40,
+    );
+    hs.key(":");
+    hs.type_text("Go to: Travel");
+    hs.key("enter");
+    let travel = hs.server.mailbox_id("Travel").unwrap();
+    hs.wait("the folder open", |hs| {
+        hs.app.state().mailbox().map(|m| m.as_str()) == Some(travel.as_str())
+    });
+    hs.wait("every conversation in the folder", |hs| {
+        hs.app.state().list().total() as u64 == on_server
+    });
+    hs.wait_text("a ferry timetable", "Ferry timetable 1");
+    hs.quit();
+}
+
+#[test]
 fn key_to_frame_latency_through_the_real_loop() {
     let mut hs = Harness::synced(160, 40);
     for i in 0..200 {

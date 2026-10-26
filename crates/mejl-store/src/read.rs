@@ -402,6 +402,16 @@ impl Reader {
         query_page(&self.cache, key, offset, limit)
     }
 
+    /// Whether a query result is cached under `key`, without reading it.
+    pub fn has_query(&self, key: &str) -> Result<bool> {
+        Ok(self
+            .cache
+            .prepare_cached("SELECT 1 FROM query_cache WHERE query_key = ?1")?
+            .query_row([key], |_| Ok(()))
+            .optional()?
+            .is_some())
+    }
+
     /// Rules in render order.
     pub fn rules(&self) -> Result<Vec<RuleRecord>> {
         let mut stmt = self.state.prepare_cached(

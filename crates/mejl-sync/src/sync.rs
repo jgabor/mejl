@@ -1026,12 +1026,25 @@ async fn load_more_inner(sh: &Shared, mailbox: &Id) -> Result<Vec<WindowReport>,
     });
     let key = mailbox_query_key(mailbox);
     let lookup = key.clone();
-    let cached = sh
+    let id = mailbox.clone();
+    let (cached, pending) = sh
         .store
-        .call(move |ctx| ctx.store.query_page(&lookup, 0, 0))
+        .call(move |ctx| -> Result<_, SyncError> {
+            let pending = ctx
+                .reader()?
+                .mailboxes()?
+                .iter()
+                .any(|m| m.id == id && m.pending);
+            Ok((ctx.store.query_page(&lookup, 0, 0)?, pending))
+        })
         .await??;
     let step = sh.cfg.load_more.max(1);
     let Some(page) = cached else {
+        // A mailbox created here that the server has not confirmed yet has
+        // no server id to query.
+        if pending {
+            return Ok(Vec::new());
+        }
         return fetch_windows(sh, &account, vec![Window::first(mailbox, sh.cfg.window)]).await;
     };
     let cached_len = u64::try_from(page.cached).unwrap_or(u64::MAX);

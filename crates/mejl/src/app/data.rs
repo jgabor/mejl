@@ -521,16 +521,32 @@ impl StoreData {
     }
 
     /// Asks for the mailbox's window to grow when the UI reads past what is
-    /// cached locally and the server has more.
+    /// cached locally and the server has more, or for its first window when
+    /// it has none. The first sync only fetches windows for role mailboxes,
+    /// so a folder's local rows are only what came in with other mailboxes
+    /// or later changes.
     fn check_window(&self, mailbox: &str, end: usize, local_total: usize) {
-        if end < local_total {
-            return;
-        }
         let key = mejl_sync::mailbox_query_key(&Id::from(mailbox));
-        let page = self.ok("a query window", self.reader.query_page(&key, 0, 0));
-        if let Some(q) = page
-            && q.total.is_some_and(|t| t > q.cached as u64)
-        {
+        let more = if end < local_total {
+            // The cheap check: a page inside the local rows only needs a
+            // window to exist.
+            match self.reader.has_query(&key) {
+                Ok(has) => !has,
+                Err(e) => {
+                    self.ok::<()>("a query window", Err(e));
+                    false
+                }
+            }
+        } else {
+            match self.reader.query_page(&key, 0, 0) {
+                Ok(page) => page.is_none_or(|q| q.total.is_some_and(|t| t > q.cached as u64)),
+                Err(e) => {
+                    self.ok::<()>("a query window", Err(e));
+                    false
+                }
+            }
+        };
+        if more {
             *self.load_more.borrow_mut() = Some(mailbox.to_owned());
         }
     }
