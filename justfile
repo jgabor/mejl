@@ -46,6 +46,11 @@ check:
 keys:
     cargo run -- keys --check
 
+# Needs cargo-edit (`cargo install cargo-edit`).
+# Set every crate's version and the internal dependencies on them: `just bump 0.3.0`.
+bump version:
+    cargo set-version --workspace {{version}}
+
 # Package every crate and build mejl as crates.io would, without publishing.
 publish-check:
     cargo publish --workspace --dry-run

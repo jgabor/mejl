@@ -11,8 +11,8 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/jgabor/mejl"
 
 [workspace.dependencies]
-# Internal. crates.io needs a version on each one. Keep it equal to
-# workspace.package.version when you bump it.
+# Internal. crates.io needs a version on each one. `just bump` keeps it equal
+# to workspace.package.version.
 mejl-jmap = { path = "crates/mejl-jmap", version = "0.2.0" }
 mejl-fake = { path = "crates/mejl-fake", version = "0.2.0" }
 mejl-store = { path = "crates/mejl-store", version = "0.2.0" }
